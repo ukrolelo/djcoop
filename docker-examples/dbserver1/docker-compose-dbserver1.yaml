@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  mariadb1:
+    image: mariadb:latest
+    container_name: mariadb1
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: your_root_password1
+      MYSQL_DATABASE: your_database1
+      MYSQL_USER: your_user1
+      MYSQL_PASSWORD: your_password1
+    ports:
+      - 9991:3306
+    volumes:
+      - /mnt/docksync_ns/mysql1/custom/my-custom.cnf:/etc/mysql/conf.d/my-custom.cnf
+      - /mnt/docksync_ns/mysql1/data:/var/lib/mysql
+      - /mnt/docksync_ns/mysql1/init:/docker-entrypoint-initdb.d
+    command: --bind-address=0.0.0.0
+networks: {}

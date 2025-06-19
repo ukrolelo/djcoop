@@ -1,0 +1,7 @@
+[mysqld]
+log_bin = mysql-bin
+server-id = 1
+binlog_format = ROW
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+
