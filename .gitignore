@@ -8,6 +8,7 @@ node_modules/
 .vscode/
 .roo/
 .refact/
+__pycache__/
 
 # Ignore package files
 package.json
