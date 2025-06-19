@@ -1,0 +1,339 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle email flag
+        document.querySelectorAll('.toggle-flag').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const emailId = this.getAttribute('data-email-id');
+                const icon = this.querySelector('i');
+                
+                fetch(`/mail/toggle-flag/${emailId}/`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.flagged) {
+                            icon.classList.remove('bi-star');
+                            icon.classList.add('bi-star-fill', 'text-warning');
+                        } else {
+                            icon.classList.remove('bi-star-fill', 'text-warning');
+                            icon.classList.add('bi-star');
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Mark as read/unread
+        document.querySelectorAll('.mark-read, .mark-unread').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const emailId = this.getAttribute('data-email-id');
+                const row = document.querySelector(`tr[data-email-id="${emailId}"]`);
+                const isMarkRead = this.classList.contains('mark-read');
+                const url = isMarkRead ? 
+                    `/mail/mark-read/${emailId}/` : 
+                    `/mail/mark-unread/${emailId}/`;
+                
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (isMarkRead) {
+                            row.classList.remove('fw-bold');
+                        } else {
+                            row.classList.add('fw-bold');
+                        }
+                    }
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>{{ account.name }}</h3>
+            <div>
+                <a href="{% url 'djmail:compose' %}" class="btn btn-primary">
+                    <i class="bi bi-envelope-plus"></i> Compose
+                </a>
+                <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-repeat"></i> Check Mail
+                </a>
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="accountsDropdown" 
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountsDropdown">
+                        <li><a class="dropdown-item" href="{% url 'djmail:accounts' %}">Manage Accounts</a></li>
+                        <li><a class="dropdown-item" href="{% url 'djmail:tasks' %}">Task Manager</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Folders Sidebar -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                Folders
+            </div>
+            <div class="list-group list-group-flush">
+                {% for folder in folders %}
+                <a href="{% url 'djmail:index' %}?folder={{ folder.folder_type }}" 
+                   class="list-group-item list-group-item-action {% if folder.folder_type == current_folder %}active{% endif %}">
+                    {% if folder.folder_type == 'inbox' %}
+                        <i class="bi bi-inbox"></i>
+                    {% elif folder.folder_type == 'sent' %}
+                        <i class="bi bi-send"></i>
+                    {% elif folder.folder_type == 'drafts' %}
+                        <i class="bi bi-file-earmark-text"></i>
+                    {% elif folder.folder_type == 'trash' %}
+                        <i class="bi bi-trash"></i>
+                    {% else %}
+                        <i class="bi bi-folder"></i>
+                    {% endif %}
+                    {{ folder.name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Search Panel -->
+        <div class="card mt-3">
+            <div class="card-header">
+                Search
+            </div>
+            <div class="card-body">
+                <form method="get" action="{% url 'djmail:index' %}">
+                    <input type="hidden" name="folder" value="{{ current_folder }}">
+                    
+                    <div class="mb-3">
+                        {{ search_form.query }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Date Range</label>
+                        <div class="row g-2">
+                            <div class="col">
+                                {{ search_form.from_date }}
+                                <small class="form-text text-muted">From</small>
+                            </div>
+                            <div class="col">
+                                {{ search_form.to_date }}
+                                <small class="form-text text-muted">To</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ search_form.has_attachment }}
+                        <label class="form-check-label" for="{{ search_form.has_attachment.id_for_label }}">
+                            Has attachment
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Recent Tasks -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Recent Tasks</span>
+                <a href="{% url 'djmail:tasks' %}" class="btn btn-sm btn-outline-primary">All Tasks</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% if recent_tasks %}
+                    {% for task in recent_tasks %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'djmail:task_detail' task.id %}">{{ task.title }}</a>
+                            <span class="badge {% if task.priority == 'high' or task.priority == 'urgent' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
+                                {{ task.get_priority_display }}
+                            </span>
+                        </div>
+                        <small class="text-muted">Status: {{ task.get_status_display }}</small>
+                        {% if task.related_email %}
+                        <div>
+                            <small><a href="{% url 'djmail:email_detail' task.related_email.id %}">View Related Email</a></small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="list-group-item">No active tasks</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Email List -->
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ folder.name }}</h5>
+                    <div>
+                        <span class="badge bg-primary">{{ page_obj.paginator.count }} emails</span>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>  <!-- Flag -->
+                            <th style="width: 35%;">From</th>
+                            <th style="width: 45%;">Subject</th>
+                            <th style="width: 20%;">Date</th>
+                            <th style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if emails %}
+                            {% for email in emails %}
+                            <tr data-email-id="{{ email.id }}" class="{% if not email.read %}fw-bold{% endif %}">
+                                <td>
+                                    <button class="btn btn-sm btn-link toggle-flag p-0 border-0" data-email-id="{{ email.id }}">
+                                        <i class="bi {% if email.flagged %}bi-star-fill text-warning{% else %}bi-star{% endif %}"></i>
+                                    </button>
+                                </td>
+                                <td>
+                                    <a href="{% url 'djmail:email_detail' email.id %}">
+                                        {% if email.sender_name %}
+                                            {{ email.sender_name }}
+                                        {% else %}
+                                            {{ email.sender }}
+                                        {% endif %}
+                                    </a>
+                                    {% if email.attachments.exists %}
+                                        <i class="bi bi-paperclip text-muted"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'djmail:email_detail' email.id %}">
+                                        {{ email.subject|default:"(No Subject)" }}
+                                    </a>
+                                </td>
+                                <td>{{ email.date_received|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-three-dots"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item" href="{% url 'djmail:email_detail' email.id %}">View</a></li>
+                                            <li><a class="dropdown-item" href="{% url 'djmail:reply' email.id %}">Reply</a></li>
+                                            <li><a class="dropdown-item" href="{% url 'djmail:forward' email.id %}">Forward</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            {% if email.read %}
+                                                <li><button class="dropdown-item mark-unread" data-email-id="{{ email.id }}">Mark as Unread</button></li>
+                                            {% else %}
+                                                <li><button class="dropdown-item mark-read" data-email-id="{{ email.id }}">Mark as Read</button></li>
+                                            {% endif %}
+                                            <li><a class="dropdown-item" href="{% url 'djmail:create_task_for_email' email.id %}">Create Task</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">Move to Trash</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <p>No emails in this folder</p>
+                                    {% if current_folder == 'inbox' %}
+                                        <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-arrow-repeat"></i> Check for New Mail
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if emails.has_other_pages %}
+            <div class="card-footer">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if emails.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ emails.previous_page_number }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Previous</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">First</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                        {% endif %}
+                        
+                        {% for num in emails.paginator.page_range %}
+                            {% if emails.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > emails.number|add:'-3' and num < emails.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if emails.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ emails.next_page_number }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ emails.paginator.num_pages }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Last</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Last</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

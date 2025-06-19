@@ -1,0 +1,251 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>{{ email.subject|default:"(No Subject)" }}</h3>
+            <div>
+                <a href="{% url 'djmail:index' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Inbox
+                </a>
+                <a href="{% url 'djmail:reply' email.id %}" class="btn btn-primary">
+                    <i class="bi bi-reply"></i> Reply
+                </a>
+                <a href="{% url 'djmail:forward' email.id %}" class="btn btn-secondary">
+                    <i class="bi bi-forward"></i> Forward
+                </a>
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="emailActionsDropdown" 
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="emailActionsDropdown">
+                        <li><a class="dropdown-item" href="{% url 'djmail:create_task_for_email' email.id %}">Create Task</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% if email.read %}
+                            <li><a class="dropdown-item" href="{% url 'djmail:mark_email_unread' email.id %}">Mark as Unread</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item" href="{% url 'djmail:mark_email_read' email.id %}">Mark as Read</a></li>
+                        {% endif %}
+                        <li><a class="dropdown-item" href="{% url 'djmail:toggle_email_flag' email.id %}">
+                            {% if email.flagged %}Unflag{% else %}Flag{% endif %} Email
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">Move to Trash</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Email Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Email Details</h5>
+                    <span class="badge {% if email.flagged %}bg-warning{% else %}bg-secondary{% endif %}">
+                        {% if email.flagged %}Flagged{% else %}Not Flagged{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="row">
+                        <div class="col-md-2 fw-bold">From:</div>
+                        <div class="col-md-10">
+                            {% if email.sender_name %}
+                                {{ email.sender_name }} &lt;{{ email.sender }}&gt;
+                            {% else %}
+                                {{ email.sender }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="row">
+                        <div class="col-md-2 fw-bold">To:</div>
+                        <div class="col-md-10">{{ email.recipients }}</div>
+                    </div>
+                </div>
+                {% if email.cc %}
+                <div class="mb-3">
+                    <div class="row">
+                        <div class="col-md-2 fw-bold">CC:</div>
+                        <div class="col-md-10">{{ email.cc }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="mb-3">
+                    <div class="row">
+                        <div class="col-md-2 fw-bold">Date:</div>
+                        <div class="col-md-10">{{ email.date_received|date:"F j, Y, H:i" }}</div>
+                    </div>
+                </div>
+                {% if email.attachments.exists %}
+                <div class="mb-3">
+                    <div class="row">
+                        <div class="col-md-2 fw-bold">Attachments:</div>
+                        <div class="col-md-10">
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for attachment in email.attachments.all %}
+                                <a href="{% url 'djmail:download_attachment' attachment.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-paperclip"></i> {{ attachment.filename }}
+                                    <span class="text-muted small">({{ attachment.size|filesizeformat }})</span>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Email Content -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Message</h5>
+            </div>
+            <div class="card-body">
+                {% if email.body_html %}
+                    <div class="email-html-content border rounded p-3">
+                        <iframe id="email-html-iframe" style="width: 100%; height: 400px; border: none;"></iframe>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const htmlContent = `{{ email.body_html|safe|escapejs }}`;
+                                const iframe = document.getElementById('email-html-iframe');
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                iframeDoc.open();
+                                iframeDoc.write(htmlContent);
+                                iframeDoc.close();
+                                
+                                // Adjust iframe height based on content
+                                setTimeout(function() {
+                                    iframe.style.height = (iframeDoc.body.scrollHeight + 20) + 'px';
+                                }, 100);
+                            });
+                        </script>
+                    </div>
+                {% else %}
+                    <div class="email-text-content border rounded p-3">
+                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ email.body_text }}</pre>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Related Tasks -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Related Tasks</h5>
+                    <a href="{% url 'djmail:create_task_for_email' email.id %}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> New Task
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if related_tasks %}
+                    <div class="list-group">
+                        {% for task in related_tasks %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">{{ task.title }}</h6>
+                                <span class="badge {% if task.priority == 'high' or task.priority == 'urgent' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge {% if task.status == 'completed' %}bg-success{% elif task.status == 'in_progress' %}bg-primary{% elif task.status == 'deferred' %}bg-secondary{% else %}bg-light text-dark{% endif %}">
+                                    {{ task.get_status_display }}
+                                </span>
+                                
+                                <div>
+                                    {% if task.due_date %}
+                                    <small class="text-muted">Due: {{ task.due_date|date:"M d, Y" }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            {% if task.description %}
+                            <div class="mt-2 small text-muted">
+                                {{ task.description|truncatechars:100 }}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mt-2">
+                                <a href="{% url 'djmail:task_detail' task.id %}" class="btn btn-sm btn-outline-secondary">View Task</a>
+                                
+                                {% if task.status != 'completed' %}
+                                <form method="post" action="{% url 'djmail:task_status_update' task.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="completed">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Mark Complete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center mb-0">No tasks linked to this email</p>
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'djmail:create_task_for_email' email.id %}" class="btn btn-outline-primary">
+                            Create a Task for this Email
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Quick Task Form -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Task Creation</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'djmail:create_task_for_email' email.id %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_title" class="form-label">Task Title</label>
+                        {{ task_form.title }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_priority" class="form-label">Priority</label>
+                        {{ task_form.priority }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_status" class="form-label">Status</label>
+                        {{ task_form.status }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_due_date" class="form-label">Due Date</label>
+                        {{ task_form.due_date }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label">Description</label>
+                        {{ task_form.description }}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Create Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

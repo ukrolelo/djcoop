@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - DjCoop</title>
+    {% load static %}
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+    <link href="{% static 'assets/vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'assets/vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: #f8f9fa;
+            padding-top: 20px;
+        }
+        .sidebar .nav-link {
+            color: #333;
+            padding: 10px 20px;
+        }
+        .sidebar .nav-link.active {
+            background: #e9ecef;
+            color: #007bff;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .replication-arrow {
+            font-size: 24px;
+            color: #28a745;
+        }
+        .server-card {
+            border: 2px solid #dee2e6;
+        }
+        .server-card.source {
+            border-color: #28a745;
+        }
+        .server-card.target {
+            border-color: #007bff;
+        }
+        /* Additional styles for wizard */
+        .badge.bg-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .badge.bg-info i {
+            font-size: 0.875em;
+        }
+        .alert pre {
+            margin-bottom: 0;
+        }
+        .alert code {
+            white-space: pre-wrap;
+        }
+        /* Wizard specific styles */
+        .wizard-progress {
+            height: 0.5rem;
+        }
+        .step-indicators {
+            margin-top: 0.5rem;
+        }
+        .step {
+            position: relative;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .step.active {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .step.completed {
+            color: #28a745;
+        }
+        .step.completed::after {
+            content: "✓";
+            margin-left: 0.25rem;
+        }
+        .wizard-step {
+            transition: all 0.3s ease-in-out;
+        }
+        .form-select:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .btn-primary {
+            padding: 0.5rem 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar">
+                <h4 class="px-3 mb-4">DjCoop</h4>
+                <nav class="nav flex-column">
+                    <a class="nav-link {% if active_menu == 'dashboard' %}active{% endif %}" 
+                       href="{% url 'core:dashboard' %}">Dashboard</a>
+                    <a class="nav-link {% if active_menu == 'djsql' %}active{% endif %}" 
+                       href="{% url 'djsql:djsql' %}">SQL Replication</a>
+                    <a class="nav-link {% if active_menu == 'djmail' %}active{% endif %}" 
+                       href="{% url 'djmail:index' %}">Email Manager</a>
+                    <a class="nav-link {% if active_menu == 'settings' %}active{% endif %}" 
+                       href="{% url 'core:settings' %}">Settings</a>
+                </nav>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-10 main-content">
+                <h2 class="mb-4">{{ title }}</h2>
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Core JavaScript -->
+    <script src="{% static 'assets/vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    {% if 'wizard' in request.path %}
+    <script src="{% static 'djsql/js/replication-wizard.js' %}"></script>
+    {% endif %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

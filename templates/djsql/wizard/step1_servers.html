@@ -1,0 +1,172 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load core_extras %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Setup Replication - Step 1: Select Servers</h5>
+            
+            {% include "djsql/wizard/progress.html" with current_step=1 %}
+            
+            <form id="serverSelectForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+                <input type="hidden" id="sourceServer" name="source" required>
+                <input type="hidden" id="targetServer" name="target" required>
+                
+                <div class="row mb-4">
+                    <!-- Source Server Selection -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Source Server (Master)</h6>
+                        <div class="row g-3" id="sourceServerList">
+                            {% for server in servers %}
+                            <div class="col-md-6">
+                                <div class="card server-card h-100" 
+                                     data-server-id="{{ server.id }}" 
+                                     data-server-type="source"
+                                     role="button"
+                                     style="border: 2px solid #e9ecef;">
+                                    <div class="card-body text-center">
+                                        <div class="server-icon mb-2">
+                                            <i class="bi bi-hdd-network fs-1"></i>
+                                        </div>
+                                        <h6 class="card-title mb-1">{{ server.name }}</h6>
+                                        <p class="card-text small text-muted mb-2">
+                                            {{ server.host }}:{{ server.port }}
+                                        </p>
+                                        <div class="server-status">
+                                            {% if server_statuses|get_item:server.id|get_item:'connected' %}
+                                                <div class="d-flex flex-column align-items-center">
+                                                    <span class="badge bg-success mb-1">
+                                                        <i class="bi bi-check-circle me-1"></i>Connected
+                                                    </span>
+                                                    {% if server_statuses|get_item:server.id|get_item:'version' %}
+                                                        <small class="text-muted">
+                                                            {% if 'MariaDB' in server_statuses|get_item:server.id|get_item:'version' %}
+                                                                MariaDB {{ server_statuses|get_item:server.id|get_item:'version'|cut:'-MariaDB'|cut:'-1:'|cut:'+maria~ubu2204-log' }}
+                                                            {% else %}
+                                                                MySQL {{ server_statuses|get_item:server.id|get_item:'version' }}
+                                                            {% endif %}
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-x-circle me-1"></i>Disconnected
+                                                </span>
+                                                <div class="error-message text-danger mt-1">
+                                                    {{ server_statuses|get_item:server.id|get_item:'error' }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <div class="server-details">
+                                            <div class="row">
+                                                <div class="col-6 border-end">
+                                                    <i class="bi bi-person-fill"></i> {{ server.username }}
+                                                </div>
+                                                <div class="col-6">
+                                                    <i class="bi bi-database-fill"></i> 
+                                                    {% if server_statuses|get_item:server.id|get_item:'connected' %}
+                                                        {% if 'MariaDB' in server_statuses|get_item:server.id|get_item:'version' %}
+                                                            MariaDB
+                                                        {% else %}
+                                                            MySQL
+                                                        {% endif %}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Target Server Selection -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Target Server (Slave)</h6>
+                        <div class="row g-3" id="targetServerList">
+                            {% for server in servers %}
+                            <div class="col-md-6">
+                                <div class="card server-card h-100" 
+                                     data-server-id="{{ server.id }}" 
+                                     data-server-type="target"
+                                     role="button"
+                                     style="border: 2px solid #e9ecef;">
+                                    <!-- Same card content as source server -->
+                                    <div class="card-body text-center">
+                                        <div class="server-icon mb-2">
+                                            <i class="bi bi-hdd-network-fill fs-1"></i>
+                                        </div>
+                                        <h6 class="card-title mb-1">{{ server.name }}</h6>
+                                        <p class="card-text small text-muted mb-2">
+                                            {{ server.host }}:{{ server.port }}
+                                        </p>
+                                        <div class="server-status">
+                                            {% if server_statuses|get_item:server.id|get_item:'connected' %}
+                                                <div class="d-flex flex-column align-items-center">
+                                                    <span class="badge bg-success mb-1">
+                                                        <i class="bi bi-check-circle me-1"></i>Connected
+                                                    </span>
+                                                    {% if server_statuses|get_item:server.id|get_item:'version' %}
+                                                        <small class="text-muted">
+                                                            MySQL {{ server_statuses|get_item:server.id|get_item:'version' }}
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-x-circle me-1"></i>Disconnected
+                                                </span>
+                                                <div class="error-message text-danger mt-1">
+                                                    {{ server_statuses|get_item:server.id|get_item:'error' }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <div class="server-details">
+                                            <div class="row">
+                                                <div class="col-6 border-end">
+                                                    <i class="bi bi-person-fill"></i> {{ server.username }}
+                                                </div>
+                                                <div class="col-6">
+                                                    <i class="bi bi-database-fill"></i> 
+                                                    {% if server_statuses|get_item:server.id|get_item:'connected' %}
+                                                        MySQL
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        Next <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% include "djsql/wizard/modals.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'djsql/js/wizard/step1.js' %}"></script>
+{% endblock %}

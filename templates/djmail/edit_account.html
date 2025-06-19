@@ -1,0 +1,98 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Edit Email Account: {{ account.name }}</h3>
+            <a href="{% url 'djmail:accounts' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Accounts
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Email Account Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_name" class="form-label">Account Name</label>
+                        {{ form.name }}
+                        <div class="form-text">A friendly name for this account</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_email" class="form-label">Email Address</label>
+                        {{ form.email }}
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="id_pop3_server" class="form-label">POP3 Server</label>
+                            {{ form.pop3_server }}
+                            <div class="form-text">e.g., pop.gmail.com</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="id_pop3_port" class="form-label">POP3 Port</label>
+                            {{ form.pop3_port }}
+                            <div class="form-text">Usually 995 for SSL</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="id_smtp_server" class="form-label">SMTP Server</label>
+                            {{ form.smtp_server }}
+                            <div class="form-text">e.g., smtp.gmail.com</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="id_smtp_port" class="form-label">SMTP Port</label>
+                            {{ form.smtp_port }}
+                            <div class="form-text">Usually 587 for TLS</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Username</label>
+                        {{ form.username }}
+                        <div class="form-text">Usually your full email address</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">Password</label>
+                        {{ form.password }}
+                        <div class="form-text">Leave blank to keep current password</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ form.use_ssl }}
+                        <label class="form-check-label" for="id_use_ssl">
+                            Use SSL/TLS for secure connection
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ form.is_default }}
+                        <label class="form-check-label" for="id_is_default">
+                            Set as default account
+                        </label>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'djmail:accounts' %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Update Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

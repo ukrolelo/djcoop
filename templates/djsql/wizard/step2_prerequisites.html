@@ -1,0 +1,350 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load core_extras %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Setup Replication - Prerequisites Check</h5>
+            
+            {% include "djsql/wizard/progress.html" with current_step=2 %}
+            
+            <form id="prerequisitesForm" action="{% url 'djsql:setup_replication_step' step=2 %}" method="post">
+                {% csrf_token %}
+                
+                <div class="row mb-4">
+                    <!-- Source Server Prerequisites -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    Source Server: {{ source.name }}
+                                    {% if source.type %}
+                                        <span class="badge bg-primary me-1">{{ source.type }}</span>
+                                    {% endif %}
+                                    <span class="badge bg-secondary">{{ source.version }}</span>
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="mb-3">Required Privileges</h6>
+                                <ul class="list-group mb-3">
+                                    {% for priv in source.required_privs %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center text-muted">
+                                        {{ priv }}
+                                        <span class="badge bg-secondary rounded-pill">Required</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                
+                                <h6 class="mb-3">Available Users</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Select</th>
+                                                <th>User</th>
+                                                <th>Host</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for user in source.users %}
+                                            <tr>
+                                                <td>
+                                                    <input type="radio" 
+                                                           name="source_user" 
+                                                           class="form-check-input"
+                                                           value="{{ user.user }}@{{ user.host }}"
+                                                           {% if not user.sufficient %}disabled{% endif %}>
+                                                </td>
+                                                <td>{{ user.user }}</td>
+                                                <td>{{ user.host }}</td>
+                                                <td>
+                                                    {% if user.sufficient %}
+                                                        <span class="badge bg-success">Sufficient</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Missing Privileges</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-info check-privileges-btn me-1"
+                                                            data-server-id="{{ source.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}">
+                                                        <i class="bi bi-eye"></i> Show Grants
+                                                    </button>
+                                                    {% if not user.sufficient %}
+                                                    <button type="button" class="btn btn-sm btn-primary grant-privileges-btn"
+                                                            data-server-id="{{ source.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}"
+                                                            data-missing-privs="{{ source.required_privs|join:',' }}">
+                                                        Grant Privileges
+                                                    </button>
+                                                    {% endif %}
+                                                    <button type="button" class="btn btn-sm btn-danger delete-user-btn ms-1"
+                                                            data-server-id="{{ source.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Add Create New SQL User button -->
+                                <button type="button" class="btn btn-secondary btn-sm mt-2"
+                                        onclick="wizardHandlers.openCreateSqlUserModal('{{ source.server_id }}', 'source')">
+                                    <i class="bi bi-plus-circle me-1"></i> Create New SQL User
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Target Server Prerequisites -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    Target Server: {{ target.name }}
+                                    {% if target.type %}
+                                        <span class="badge bg-primary me-1">{{ target.type }}</span>
+                                    {% endif %}
+                                    <span class="badge bg-secondary">{{ target.version }}</span>
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="mb-3">Required Privileges</h6>
+                                <ul class="list-group mb-3">
+                                    {% for priv in target.required_privs %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center text-muted">
+                                        {{ priv }}
+                                        <span class="badge bg-secondary rounded-pill">Required</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                
+                                <h6 class="mb-3">Available Users</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Select</th>
+                                                <th>User</th>
+                                                <th>Host</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for user in target.users %}
+                                            <tr>
+                                                <td>
+                                                    <input type="radio" 
+                                                           name="target_user" 
+                                                           class="form-check-input"
+                                                           value="{{ user.user }}@{{ user.host }}"
+                                                           {% if not user.sufficient %}disabled{% endif %}>
+                                                </td>
+                                                <td>{{ user.user }}</td>
+                                                <td>{{ user.host }}</td>
+                                                <td>
+                                                    {% if user.sufficient %}
+                                                        <span class="badge bg-success">Sufficient</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Missing Privileges</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-info check-privileges-btn me-1"
+                                                            data-server-id="{{ target.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}">
+                                                        <i class="bi bi-eye"></i> Show Grants
+                                                    </button>
+                                                    {% if not user.sufficient %}
+                                                    <button type="button" class="btn btn-sm btn-primary grant-privileges-btn"
+                                                            data-server-id="{{ target.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}"
+                                                            data-missing-privs="{{ target.required_privs|join:',' }}">
+                                                        Grant Privileges
+                                                    </button>
+                                                    {% endif %}
+                                                    <button type="button" class="btn btn-sm btn-danger delete-user-btn ms-1"
+                                                            data-server-id="{{ target.server_id }}"
+                                                            data-user="{{ user.user }}"
+                                                            data-host="{{ user.host }}">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Add Create New SQL User button -->
+                                <button type="button" class="btn btn-secondary btn-sm mt-2"
+                                        onclick="wizardHandlers.openCreateSqlUserModal('{{ target.server_id }}', 'target')">
+                                    <i class="bi bi-plus-circle me-1"></i> Create New SQL User
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-secondary" id="backBtn">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="nextBtn">
+                        Next <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Grant Privileges Modal -->
+<div class="modal fade" id="grantPrivilegesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-key me-2"></i>Grant Missing Privileges
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="grantCommandPreview" class="mb-3">
+                    <h6>SQL Command:</h6>
+                    <div class="form-group">
+                        <textarea id="sqlCommand" class="form-control font-monospace" rows="4" style="resize: vertical;"></textarea>
+                        <small class="form-text text-muted">You can modify the SQL command if needed.</small>
+                    </div>
+                </div>
+                <div id="grantCommandOutput" class="d-none">
+                    <h6>Server Output:</h6>
+                    <pre class="bg-light p-3 rounded"><code id="commandOutput"></code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="executeGrantBtn">
+                    <i class="bi bi-play-fill me-1"></i>Execute Command
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check Privileges Modal -->
+<div class="modal fade" id="checkPrivilegesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye me-2"></i>Current User Privileges
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="privilegesOutput" class="mb-3">
+                    <h6>SHOW GRANTS Output:</h6>
+                    <pre class="bg-light p-3 rounded"><code id="grantsOutput">Loading...</code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Error
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create New SQL User Modal -->
+<div class="modal fade" id="createSqlUserModal" tabindex="-1" aria-labelledby="createSqlUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createSqlUserModalLabel">Create New SQL User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="newSqlUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="newSqlUsername" placeholder="Enter new SQL username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newSqlPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="newSqlPassword" placeholder="Enter password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newSqlHost" class="form-label">Host</label>
+                        <input type="text" class="form-control" id="newSqlHost" value="%" placeholder="Enter host (or use % for any)">
+                    </div>
+                    <!-- Add alert placeholder -->
+                    <div id="createUserAlert" class="alert d-none">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitNewSqlUser">Create User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete User Confirmation Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="deleteUserModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Delete SQL User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUser">Delete User</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap is already loaded in base.html -->
+<script src="{% static 'djsql/js/wizard/step2.js' %}"></script>
+{% endblock %}

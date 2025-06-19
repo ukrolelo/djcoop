@@ -1,0 +1,152 @@
+<!-- Error Alert Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Error
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check Privileges Modal -->
+<div class="modal fade" id="checkPrivilegesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-shield-check me-2"></i>User Privileges
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="bg-light p-3 rounded"><code id="grantsOutput"></code></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grant Privileges Modal -->
+<div class="modal fade" id="grantPrivilegesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-key me-2"></i>Grant Missing Privileges
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="grantCommandPreview" class="mb-3">
+                    <h6>SQL Command to Execute:</h6>
+                    <pre class="bg-light p-3 rounded"><code id="sqlCommand"></code></pre>
+                </div>
+                <div id="grantCommandOutput" class="d-none">
+                    <h6>Command Output:</h6>
+                    <pre class="bg-light p-3 rounded"><code id="commandOutput"></code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="executeGrantBtn">
+                    Execute Command
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Replication Details Modal -->
+<div class="modal fade" id="replicationDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-diagram-2 me-2"></i>Replication Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <h6>Status Information</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Status:</strong> <span id="replStatus"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Lag:</strong> <span id="replLag"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Step:</strong> <span id="replStep"></span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Slave Status</h6>
+                    <pre class="bg-light p-3 rounded"><code id="slaveStatus"></code></pre>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Recent Logs</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Step</th>
+                                    <th>Status</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody id="replLogs"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="refreshDetailsBtn">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete User Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-trash me-2"></i>Delete User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="deleteUserAlert" class="alert d-none"></div>
+                <p>Are you sure you want to delete user <span id="deleteUserName" class="fw-bold"></span>?</p>
+                <p class="text-danger mb-0">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUser">
+                    Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

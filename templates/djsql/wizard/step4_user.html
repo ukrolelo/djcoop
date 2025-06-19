@@ -1,0 +1,212 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load core_extras %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Setup Replication - Step 4: Replication Overview</h5>
+            
+            {% include "djsql/wizard/progress.html" with current_step=4 %}
+            
+            <form id="replicationOverviewForm">
+                {% csrf_token %}
+                
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header bg-primary bg-opacity-10">
+                                <h6 class="mb-0">Replication Configuration Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Source Server -->
+                                    <div class="col-md-6">
+                                        <div class="card border-0 shadow-sm mb-3">
+                                            <div class="card-body">
+                                                <h6 class="card-title">
+                                                    <i class="bi bi-server text-primary me-2"></i>Source Server
+                                                </h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="mb-2">
+                                                        <strong>Name:</strong> 
+                                                        <span class="text-primary">{{ source.name }}</span>
+                                                    </li>
+                                                    <li class="mb-2">
+                                                        <strong>Host:</strong> {{ source.host }}
+                                                    </li>
+                                                    <li class="mb-2">
+                                                        <strong>Port:</strong> {{ source.port }}
+                                                    </li>
+                                                    <li>
+                                                        <strong>Replication User:</strong> 
+                                                        <code>{{ source_user }}</code>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Target Server -->
+                                    <div class="col-md-6">
+                                        <div class="card border-0 shadow-sm mb-3">
+                                            <div class="card-body">
+                                                <h6 class="card-title">
+                                                    <i class="bi bi-server text-success me-2"></i>Target Server
+                                                </h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="mb-2">
+                                                        <strong>Name:</strong> 
+                                                        <span class="text-success">{{ target.name }}</span>
+                                                    </li>
+                                                    <li class="mb-2">
+                                                        <strong>Host:</strong> {{ target.host }}
+                                                    </li>
+                                                    <li class="mb-2">
+                                                        <strong>Port:</strong> {{ target.port }}
+                                                    </li>
+                                                    <li>
+                                                        <strong>Replication User:</strong> 
+                                                        <code>{{ target_user }}</code>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Replication Details -->
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-database text-primary me-2"></i>Replication Details
+                                        </h6>
+                                        
+                                        <!-- Selected Databases -->
+                                        <div class="mb-4">
+                                            <h6 class="text-muted mb-3">Selected Databases</h6>
+                                            <div class="list-group">
+                                                {% for db in databases %}
+                                                <div class="list-group-item">
+                                                    <i class="bi bi-database-fill me-2 text-primary"></i>
+                                                    {{ db }}
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+
+                                        <!-- Binary Log Information -->
+                                        <div class="mb-4">
+                                            <h6 class="text-muted mb-3">Binary Log Position</h6>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <div class="bg-light rounded p-3">
+                                                        <small class="text-muted d-block">Binary Log File</small>
+                                                        <code class="text-primary">{{ master_log_file }}</code>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="bg-light rounded p-3">
+                                                        <small class="text-muted d-block">Position</small>
+                                                        <code class="text-primary">{{ master_log_pos }}</code>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'djsql:setup_replication_step' step=3 %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        Complete Setup <i class="bi bi-check-circle ms-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% include "djsql/wizard/modals.html" %}
+
+<!-- Success Modal -->
+<div class="modal fade" id="setupCompleteModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-4" id="successMessage">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('replicationOverviewForm');
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating Replication Link...';
+        
+        try {
+            const response = await fetch('/djsql/replication/setup/4/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    action: 'create_replication_link'
+                })
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                // Show success message and redirect
+                const successModal = new bootstrap.Modal(document.getElementById('setupCompleteModal'));
+                document.getElementById('successMessage').innerHTML = `
+                    <div class="text-center mb-4">
+                        <div class="rounded-circle bg-success bg-opacity-25 p-3 d-inline-block mb-3">
+                            <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        </div>
+                        <h5>Replication Setup Complete!</h5>
+                        <p class="text-muted">The replication link has been created successfully.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{% url 'djsql:djsql' %}" class="btn btn-primary">
+                            <i class="bi bi-arrow-left me-2"></i>Return to Dashboard
+                        </a>
+                    </div>
+                `;
+                successModal.show();
+                
+                // Redirect after a short delay
+                setTimeout(() => {
+                    window.location.href = '/djsql/';
+                }, 3000);
+            } else {
+                throw new Error(data.message || 'Failed to create replication link');
+            }
+        } catch (error) {
+            const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+            document.getElementById('errorMessage').textContent = error.message;
+            errorModal.show();
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+});
+</script>
+{% endblock %}

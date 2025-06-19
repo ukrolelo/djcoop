@@ -1,0 +1,130 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clear file input on cancel
+        document.querySelector('#cancel-compose').addEventListener('click', function(e) {
+            e.preventDefault();
+            if (confirm('Are you sure you want to discard this email?')) {
+                window.location.href = "{% url 'djmail:index' %}";
+            }
+        });
+        
+        // File attachment preview
+        const fileInput = document.getElementById('id_attachments');
+        const fileList = document.getElementById('attachment-list');
+        
+        fileInput.addEventListener('change', function() {
+            fileList.innerHTML = '';
+            
+            if (this.files.length > 0) {
+                document.getElementById('attachment-preview').classList.remove('d-none');
+                
+                Array.from(this.files).forEach(file => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    
+                    const fileInfo = document.createElement('span');
+                    fileInfo.innerHTML = `<i class="bi bi-paperclip"></i> ${file.name} <small class="text-muted">(${formatFileSize(file.size)})</small>`;
+                    
+                    listItem.appendChild(fileInfo);
+                    fileList.appendChild(listItem);
+                });
+            } else {
+                document.getElementById('attachment-preview').classList.add('d-none');
+            }
+        });
+        
+        // Helper function to format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>
+                {% if reply_to %}
+                    Reply to: {{ reply_to.subject }}
+                {% elif forward %}
+                    Forward: {{ forward.subject }}
+                {% else %}
+                    Compose New Email
+                {% endif %}
+            </h3>
+            <a href="{% url 'djmail:index' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Inbox
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    From: {{ account.name }} &lt;{{ account.email }}&gt;
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_to" class="form-label">To:</label>
+                        {{ form.to }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_cc" class="form-label">CC:</label>
+                        {{ form.cc }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_bcc" class="form-label">BCC:</label>
+                        {{ form.bcc }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_subject" class="form-label">Subject:</label>
+                        {{ form.subject }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_body" class="form-label">Message:</label>
+                        {{ form.body }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_attachments" class="form-label">Attachments:</label>
+                        {{ form.attachments }}
+                    </div>
+                    
+                    <div id="attachment-preview" class="mb-3 d-none">
+                        <p class="fw-bold">Attached Files:</p>
+                        <ul id="attachment-list" class="list-group"></ul>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <button type="button" id="cancel-compose" class="btn btn-outline-secondary">Discard</button>
+                        <button type="submit" class="btn btn-primary">Send Email</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

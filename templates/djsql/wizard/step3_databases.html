@@ -1,0 +1,288 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load core_extras %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Setup Replication - Step 3: Database Selection</h5>
+            
+            {% include "djsql/wizard/progress.html" with current_step=3 %}
+            
+            <form id="databaseSelectForm">
+                {% csrf_token %}
+                
+                <!-- Source Database Selection -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Select Source Database</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="sourceDatabase" class="form-label">Available Databases on {{ source.name }}</label>
+                            <select class="form-select mb-3" id="sourceDatabase" name="database"
+                                    data-source-host="{{ source.host }}"
+                                    data-source-port="{{ source.port }}"
+                                    data-source-user="{{ source.repl_user }}"
+                                    data-source-user-host="{{ source.repl_host|default:'%' }}"
+                                    data-target-host="{{ target.host }}"
+                                    data-target-port="{{ target.port }}"
+                                    data-target-user="{{ target.repl_user }}"
+                                    data-target-user-host="{{ target.repl_host|default:'%' }}">
+                                <option value="">Choose a database...</option>
+                                {% for db in source.databases %}
+                                <option value="{{ db.name }}" 
+                                        data-size="{{ db.size }}"
+                                        data-tables="{{ db.tables }}"
+                                        {% if db.name in target.databases %}data-exists="true"{% endif %}>
+                                    {{ db.name }} ({{ db.size }}, {{ db.tables }} tables)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Source Commands -->
+                        <div class="form-group mt-4">
+                            <label class="form-label">Source Server Commands</label>
+                            <textarea class="form-control font-monospace" 
+                                    id="sourceCommand" 
+                                    rows="6"></textarea>
+                            <div class="form-text mb-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                You can modify these commands before execution if needed.
+                            </div>
+                            <button type="button" class="btn btn-primary mt-3" id="sendSourceCommand">
+                                <i class="bi bi-send me-1"></i>Execute on Source
+                            </button>
+                            <div id="sourceCommandOutput" class="alert mt-3 d-none"></div>
+                        </div>
+
+                        <!-- Data Transfer -->
+                        <div class="form-group mt-4 data-transfer-section d-none">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="border-bottom flex-grow-1"></div>
+                                <div class="mx-3">
+                                    <span class="badge bg-primary rounded-pill">
+                                        <i class="bi bi-arrow-down-circle me-1"></i>Next Step
+                                    </span>
+                                </div>
+                                <div class="border-bottom flex-grow-1"></div>
+                            </div>
+                            
+                            <label class="form-label h5 mb-3">
+                                <i class="bi bi-database-fill-down me-2 text-primary"></i>
+                                Database Transfer
+                            </label>
+                            
+                            <div class="alert alert-info d-flex align-items-start">
+                                <i class="bi bi-info-circle me-2 mt-1"></i>
+                                <div>
+                                    <strong>Important:</strong><br>
+                                    Now that we have the binary log position from source, we need to transfer the database data 
+                                    before configuring replication on target. This ensures the target has an exact copy 
+                                    of the source database at the recorded position.
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <!-- Command Details -->
+                                <div class="col-md-4">
+                                    <div class="card h-100 bg-light border-0 shadow-sm">
+                                        <div class="card-header bg-transparent border-0 pt-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-2">
+                                                    <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary p-2">
+                                                        <i class="bi bi-gear-fill"></i>
+                                                    </span>
+                                                </div>
+                                                <h6 class="mb-0">Transfer Configuration</h6>
+                                            </div>
+                                        </div>
+                                        <div class="card-body pt-0">
+                                            <div class="list-group list-group-flush">
+                                                <div class="list-group-item bg-transparent px-0">
+                                                    <div class="d-flex align-items-start">
+                                                        <div class="me-3">
+                                                            <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+                                                                <i class="bi bi-shield-check text-primary"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-medium text-dark mb-1">Consistent Snapshot</div>
+                                                            <div class="text-secondary small">Using <code class="text-primary">--single-transaction</code> for InnoDB tables</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="list-group-item bg-transparent px-0">
+                                                    <div class="d-flex align-items-start">
+                                                        <div class="me-3">
+                                                            <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+                                                                <i class="bi bi-box text-primary"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-medium text-dark mb-1">Complete Schema</div>
+                                                            <div class="text-secondary small">Including triggers, routines, and events</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="list-group-item bg-transparent px-0">
+                                                    <div class="d-flex align-items-start">
+                                                        <div class="me-3">
+                                                            <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+                                                                <i class="bi bi-bookmark-check text-primary"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-medium text-dark mb-1">Replication Ready</div>
+                                                            <div class="text-secondary small">Binary log position preserved</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="list-group-item bg-transparent px-0 border-bottom-0">
+                                                    <div class="d-flex align-items-start">
+                                                        <div class="me-3">
+                                                            <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+                                                                <i class="bi bi-lightning text-primary"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-medium text-dark mb-1">Direct Pipeline</div>
+                                                            <div class="text-secondary small">Memory-efficient streaming transfer</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Command Preview -->
+                                <div class="col-md-8">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-header bg-dark text-light py-3 px-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle bg-primary bg-opacity-25 p-2 me-2">
+                                                        <i class="bi bi-terminal text-primary"></i>
+                                                    </div>
+                                                    <strong>Transfer Command</strong>
+                                                </div>
+                                                <div>
+                                                    <span class="badge bg-primary bg-opacity-25 text-primary">
+                                                        <i class="bi bi-arrow-left-right me-1"></i>Direct Transfer
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="bg-dark">
+                                                <div class="font-monospace text-light p-4" style="font-size: 0.875rem; line-height: 1.6;">
+                                                    <pre class="mb-0 text-wrap" style="white-space: pre-wrap;" id="transferCommand"></pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Button -->
+                            <div class="mt-4 pt-3 border-top">
+                                <div class="row align-items-center g-3">
+                                    <div class="col-md-auto">
+                                        <button type="button" class="btn btn-primary btn-lg px-4 d-flex align-items-center shadow-sm" id="transferData">
+                                            <div class="rounded-circle bg-white bg-opacity-25 p-2 me-2">
+                                                <i class="bi bi-database-fill-down"></i>
+                                            </div>
+                                            <span>Start Database Transfer</span>
+                                        </button>
+                                    </div>
+                                    <div class="col">
+                                        <div class="alert alert-info bg-info bg-opacity-10 border-info py-3 mb-0">
+                                            <div class="d-flex align-items-start">
+                                                <div class="rounded-circle bg-info bg-opacity-25 p-2 me-3">
+                                                    <i class="bi bi-clock-history text-info"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="text-info mb-2">Transfer Duration Information</h6>
+                                                    <div class="text-dark mb-2">The completion time will vary based on:</div>
+                                                    <div class="row g-2">
+                                                        <div class="col-md-4">
+                                                            <div class="d-flex align-items-center p-2 rounded bg-white bg-opacity-75">
+                                                                <i class="bi bi-database text-info me-2"></i>
+                                                                <div class="small">
+                                                                    <strong class="d-block">Database Size</strong>
+                                                                    <span class="text-secondary">Tables & stored procedures</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="d-flex align-items-center p-2 rounded bg-white bg-opacity-75">
+                                                                <i class="bi bi-wifi text-info me-2"></i>
+                                                                <div class="small">
+                                                                    <strong class="d-block">Network Speed</strong>
+                                                                    <span class="text-secondary">Between servers</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="d-flex align-items-center p-2 rounded bg-white bg-opacity-75">
+                                                                <i class="bi bi-cpu text-info me-2"></i>
+                                                                <div class="small">
+                                                                    <strong class="d-block">Server Load</strong>
+                                                                    <span class="text-secondary">Available resources</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="transferOutput" class="alert mt-3 d-none"></div>
+                        </div>
+
+                        <!-- Target Commands -->
+                        <div class="form-group mt-4">
+                            <label class="form-label">Target Server Commands</label>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Execute these commands only after successful data transfer.
+                            </div>
+                            <textarea class="form-control font-monospace" 
+                                    id="targetCommand" 
+                                    rows="6"></textarea>
+                            <div class="form-text mb-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                You can modify these commands before execution. Make sure to replace 'your_password_here' with the actual replication password.
+                            </div>
+                            <button type="button" class="btn btn-primary mt-3" id="sendTargetCommand" disabled>
+                                <i class="bi bi-send me-1"></i>Execute on Target
+                            </button>
+                            <div id="targetCommandOutput" class="alert mt-3 d-none"></div>
+<div id="command-output" class="mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'djsql:setup_replication_step' step=2 %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        Next <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% include "djsql/wizard/modals.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'djsql/js/wizard/step3.js' %}"></script>
+{% endblock %}

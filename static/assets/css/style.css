@@ -1,0 +1,263 @@
+/* Main CSS file */
+:root {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Open Sans", sans-serif;
+  background: #f6f9ff;
+  color: #444444;
+}
+
+a {
+  color: #4154f1;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #717ff5;
+  text-decoration: none;
+}
+
+/* Header */
+.header {
+  transition: all 0.5s;
+  z-index: 997;
+  height: 60px;
+  box-shadow: 0px 2px 20px rgba(1, 41, 112, 0.1);
+  background-color: #fff;
+  padding-left: 20px;
+}
+
+.header .logo {
+  line-height: 0;
+}
+
+.header .logo img {
+  max-height: 40px;
+  margin-right: 6px;
+}
+
+.header .logo span {
+  font-size: 24px;
+  font-weight: 700;
+  color: #012970;
+  font-family: "Nunito", sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  z-index: 996;
+  transition: all 0.3s;
+  padding: 20px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #aab7cf transparent;
+  box-shadow: 0px 0px 20px rgba(1, 41, 112, 0.1);
+  background-color: #fff;
+}
+
+.sidebar-nav {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sidebar-nav li {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sidebar-nav .nav-item {
+  margin-bottom: 5px;
+}
+
+.sidebar-nav .nav-link {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #4154f1;
+  padding: 10px 15px;
+  border-radius: 4px;
+  background: #f6f9ff;
+}
+
+.sidebar-nav .nav-link i {
+  font-size: 16px;
+  margin-right: 10px;
+  color: #4154f1;
+}
+
+.sidebar-nav .nav-link.collapsed {
+  color: #012970;
+  background: #fff;
+}
+
+.sidebar-nav .nav-link.collapsed i {
+  color: #899bbd;
+}
+
+.sidebar-nav .nav-link:hover {
+  color: #4154f1;
+  background: #f6f9ff;
+}
+
+.sidebar-nav .nav-link:hover i {
+  color: #4154f1;
+}
+
+/* Main content area */
+#main {
+  margin-top: 60px;
+  padding: 20px 30px;
+  transition: all 0.3s;
+  margin-left: 300px;
+}
+
+.pagetitle {
+  margin-bottom: 10px;
+}
+
+.pagetitle h1 {
+  font-size: 24px;
+  margin-bottom: 0;
+  font-weight: 600;
+  color: #012970;
+}
+
+/* Footer */
+.footer {
+  padding: 20px 0;
+  font-size: 14px;
+  transition: all 0.3s;
+  border-top: 1px solid #cddfff;
+  margin-left: 300px;
+}
+
+/* Replication Wizard Styles */
+.wizard-progress {
+  height: 0.5rem;
+}
+
+.step-indicators {
+  position: relative;
+}
+
+.step-indicators::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 2px solid #e9ecef;
+  z-index: 0;
+}
+
+.step {
+  background: white;
+  padding: 0.5rem 1rem;
+  border-radius: 1rem;
+  border: 2px solid #e9ecef;
+  position: relative;
+  z-index: 1;
+  font-size: 0.9rem;
+}
+
+.step.active {
+  border-color: #4154f1;
+  color: #4154f1;
+  font-weight: 500;
+}
+
+.step.completed {
+  border-color: #2eca6a;
+  color: #2eca6a;
+}
+
+.server-card {
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  border: 2px solid #e9ecef;
+  background-color: white;
+}
+
+.server-card:hover:not(.disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0.125rem 0.25rem rgba(1, 41, 112, 0.1);
+}
+
+.server-card.selected {
+  border-color: #4154f1;
+  background-color: #eef1ff !important;
+}
+
+.server-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.server-card.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.server-card.selected .server-icon {
+  color: #4154f1;
+}
+
+.server-icon {
+  color: #899bbd;
+  transition: color 0.2s ease-in-out;
+}
+
+.error-message {
+  font-size: 0.75rem;
+}
+
+/* Server Card Status Colors */
+.server-card .badge.bg-success {
+  background-color: #2eca6a !important;
+}
+
+.server-card .badge.bg-danger {
+  background-color: #ff771d !important;
+}
+
+/* Server Card Footer */
+.server-card .card-footer {
+  background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.server-details .row {
+  margin: 0 -0.5rem;
+}
+
+.server-details .col-6 {
+  padding: 0 0.5rem;
+}
+
+.server-details i {
+  color: #899bbd;
+  margin-right: 0.25rem;
+}
+
+/* Replication Details Modal Styles */
+#replicationDetailsModal .modal-content {
+  background-color: #ffffff !important; /* Solid white with 0% transparency */
+  border: none;
+  box-shadow: 0 0.5rem 1rem #000000; /* Solid black shadow with 0% transparency */
+}
+
+#replicationDetailsModal .modal-body {
+  background-color: #ffffff !important; /* Solid white with 0% transparency */
+}
+

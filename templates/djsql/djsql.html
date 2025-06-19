@@ -1,0 +1,1099 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% load static %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="card-title mb-0">Replication Links</h5>
+                    <div>
+                        <button type="button" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#addServerModal">
+                            <i class="bi bi-plus-circle"></i> Add Server
+                        </button>
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" name="setup_replication" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Setup New Replication
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Direction</th>
+                                <th>Target</th>
+                                <th>Status</th>
+                                <th>Lag</th>
+                                <th>Databases</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for link in replications %}
+                            <tr>
+                                <td>
+                                    <strong>{{ link.source.name }}</strong><br>
+                                    <small class="text-muted">{{ link.source.host }}:{{ link.source.port }}</small>
+                                    {% if server_statuses|get_item:link.source.id|get_item:'version' %}
+                                        <br><small class="text-muted">{{ server_statuses|get_item:link.source.id|get_item:'version' }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="replication-arrow">→</span>
+                                </td>
+                                <td>
+                                    <strong>{{ link.target.name }}</strong><br>
+                                    <small class="text-muted">{{ link.target.host }}:{{ link.target.port }}</small>
+                                    {% if server_statuses|get_item:link.target.id|get_item:'version' %}
+                                        <br><small class="text-muted">{{ server_statuses|get_item:link.target.id|get_item:'version' }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% with slave_status=server_statuses|get_item:link.target.id|get_item:'slave_status' %}
+                                        <span class="badge {% if slave_status and slave_status.Slave_IO_Running == 'Yes' and slave_status.Slave_SQL_Running == 'Yes' %}bg-success{% else %}bg-danger{% endif %}">
+                                            {% if slave_status and slave_status.Slave_IO_Running == 'Yes' and slave_status.Slave_SQL_Running == 'Yes' %}
+                                                Active
+                                            {% else %}
+                                                Error
+                                            {% endif %}
+                                        </span>
+                                    {% endwith %}
+                                </td>
+                                <td>{{ link.lag_seconds }}s</td>
+                                <td>
+                                    <small>{{ link.databases|join:", " }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-sm btn-outline-primary view-details-btn" 
+                                                data-link-id="{{ link.id }}">View Details</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger delete-repl-btn"
+                                                data-link-id="{{ link.id }}"
+                                                data-source-name="{{ link.source.name }}"
+                                                data-target-name="{{ link.target.name }}">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <p class="text-muted mb-0">No replication links configured yet.</p>
+                                    <form method="post" class="mt-3">
+                                        {% csrf_token %}
+                                        <button type="submit" name="setup_replication" class="btn btn-primary">
+                                            Setup Your First Replication
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Database Servers</h5>
+                <div class="row">
+                    {% for server in servers %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card server-card {% if server_statuses|get_item:server.id|get_item:'connected' %}border-success{% else %}border-danger{% endif %}">
+                           <div class="card-body">
+                               <h5 class="card-title">{{ server.name }}</h5>
+                               <div class="server-info mb-3">
+                                   <strong>Host:</strong> {{ server.host }}<br>
+                                   <strong>Port:</strong> {{ server.port }}<br>
+                                   <strong>Username:</strong> {{ server.username }}<br>
+                                   <strong>Status:</strong>
+                                   {% if server_statuses|get_item:server.id|get_item:'connected' %}
+                                       <span class="badge bg-success">Connected</span>
+                                       {% with charset=server_statuses|get_item:server.id|get_item:'charset' %}
+                                       {% if charset %}
+                                       <br>
+                                       <small class="text-muted">
+                                           Charset: {{ charset }}<br>
+                                           Collation: {{ server_statuses|get_item:server.id|get_item:'collation' }}
+                                       </small>
+                                       {% endif %}
+                                       {% endwith %}
+                                       
+                                       {% with slave_status=server_statuses|get_item:server.id|get_item:'slave_status' %}
+                                       {% if slave_status and slave_status.Master_Host %}
+                                       <br>
+                                       <small class="text-muted">
+                                           <strong>Replication:</strong>
+                                           <span class="badge bg-info">Slave</span>
+                                           from {{ slave_status.Master_Host }}:{{ slave_status.Master_Port }}
+                                           {% if slave_status.master_server_name %}
+                                               ({{ slave_status.master_server_name }})
+                                           {% endif %}
+                                           {% if slave_status.is_error %}
+                                               <span class="badge bg-danger">Error</span>
+                                               <small class="text-danger d-block">
+                                                   {{ slave_status.Last_Error }}
+                                               </small>
+                                           {% endif %}
+                                       </small>
+                                       {% endif %}
+                                       {% endwith %}
+                                   {% else %}
+                                       <span class="badge bg-danger">Error</span>
+                                       <small class="text-danger d-block">
+                                           {{ server_statuses|get_item:server.id|get_item:'error' }}
+                                       </small>
+                                   {% endif %}
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary list-databases-btn" 
+                                            data-server-id="{{ server.id }}"
+                                            data-server-name="{{ server.name }}"
+                                            {% if not server_statuses|get_item:server.id|get_item:'connected' %}disabled{% endif %}>
+                                        List Databases
+                                    </button>
+                                    <button class="btn btn-outline-danger delete-server-btn"
+                                            data-server-id="{{ server.id }}"
+                                            data-server-name="{{ server.name }}">
+                                        <i class="bi bi-trash"></i> Delete Server
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database List Modal -->
+<div class="modal fade" id="databaseListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Databases on <span id="modalServerName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="databaseListError" class="alert alert-danger d-none">
+                </div>
+                <div id="databaseListSpinner" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div id="serverInfo" class="mb-3 d-none">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Server Information</h6>
+                            <p class="mb-1"><strong>Version:</strong> <span id="serverVersion"></span></p>
+                            <p class="mb-1"><strong>Connected Threads:</strong> <span id="serverThreads"></span></p>
+                            <p class="mb-1"><strong>Uptime:</strong> <span id="serverUptime"></span></p>
+                            <p class="mb-1"><strong>Character Set:</strong> <span id="serverCharset"></span></p>
+                            <p class="mb-0"><strong>Collation:</strong> <span id="serverCollation"></span></p>
+                                <div id="replicationInfo" class="mt-3 d-none">
+                                    <hr>
+                                    <h6 class="card-subtitle mb-2 text-muted">Replication Slave Status</h6>
+                                    <div id="replicationDetails"></div>
+                                </div>
+
+                        </div>
+                    </div>
+                </div>
+                <div id="databaseListContainer" class="d-none">
+                    <h6>Available Databases</h6>
+                    <ul id="databaseList" class="list-group">
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="cleanReplicaBtn">Clean Replica</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Replication Details Modal -->
+<div class="modal fade" id="replicationDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Replication Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="replicationError" class="alert alert-danger">
+                </div>
+                <div id="replicationDetailsSpinner" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div id="replicationDetails">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="card-subtitle mb-0 text-muted">Status Information</h6>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="refreshDetailsBtn">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <h6>Source Server</h6>
+                                    <p class="mb-1"><strong>Host:</strong> <span id="sourceHost"></span></p>
+                                    <p class="mb-1"><strong>Port:</strong> <span id="sourcePort"></span></p>
+                                    <p class="mb-1"><strong>User:</strong> <span id="sourceUser"></span></p>
+                                    <p class="mb-0"><strong>Binary Log:</strong> <span id="sourceBinlog"></span></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6>Target Server</h6>
+                                    <p class="mb-1"><strong>Host:</strong> <span id="targetHost"></span></p>
+                                    <p class="mb-1"><strong>Port:</strong> <span id="targetPort"></span></p>
+                                    <p class="mb-1"><strong>Status:</strong> <span id="replStatus"></span></p>
+                                    <p class="mb-0"><strong>Lag:</strong> <span id="replLag"></span></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6>Replication Info</h6>
+                                        <p class="mb-1"><strong>Databases:</strong></p>
+                                        <ul id="replDatabases" class="list-unstyled"></ul>
+                                    <p class="mb-1"><strong>User:</strong> <span id="replUser"></span></p>
+                                    <p class="mb-0"><strong>Last Error:</strong> <span id="replError"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="replStep"></div>
+                    </div>
+                    
+                    <!-- Slave Status Information -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">SHOW SLAVE STATUS</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover" id="slaveStatusTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Variable</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Recent Logs</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Step</th>
+                                            <th>Status</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="replLogs">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="refreshDetailsBtn">Refresh</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Replication</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% csrf_token %}
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">Warning!</h6>
+                    <p>You are about to delete the replication link:</p>
+                    <p class="mb-0"><strong id="deleteReplDetails"></strong></p>
+                </div>
+                <p>This will:</p>
+                <ul>
+                    <li>Stop the replication process if it's running</li>
+                    <li>Remove the replication configuration</li>
+                    <li>Delete all replication logs</li>
+                </ul>
+                <p class="mb-0">This action cannot be undone. Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Add Server Modal -->
+<div class="modal fade" id="addServerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Database Server</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addServerForm" method="post" action="{% url 'djsql:add_server' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Server Name</label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="e.g., Production DB, Development Server">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Host</label>
+                            <input type="text" class="form-control" name="host" required
+                                   placeholder="IP address or hostname">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" name="port" value="3306" required
+                                   min="1" max="65535">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required
+                                   placeholder="Database username">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" name="password" required
+                                       id="serverPassword">
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="3"
+                                    placeholder="Optional description of this server"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" checked>
+                                <label class="form-check-label">Server is active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>Add Server
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Server Modal -->
+<div class="modal fade" id="editServerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Database Server</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editServerForm" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="server_id" id="editServerId">
+                <div class="modal-body">
+                    <!-- Same fields as Add Server Modal -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Server Name</label>
+                            <input type="text" class="form-control" name="name" required
+                                   id="editServerName">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Host</label>
+                            <input type="text" class="form-control" name="host" required
+                                   id="editServerHost">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" name="port" required
+                                   min="1" max="65535" id="editServerPort">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required
+                                   id="editServerUsername">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" name="password"
+                                       id="editServerPassword">
+                                <button class="btn btn-outline-secondary" type="button" 
+                                        onclick="togglePasswordVisibility('editServerPassword')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Leave blank to keep current password</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="3"
+                                    id="editServerDescription"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active"
+                                       id="editServerActive">
+                                <label class="form-check-label">Server is active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Server Confirmation Modal -->
+<div class="modal fade" id="deleteServerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Server</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% csrf_token %}
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">Warning!</h6>
+                    <p>You are about to delete the server:</p>
+                    <p class="mb-0"><strong id="deleteServerDetails"></strong></p>
+                </div>
+                <p>This action cannot be undone. Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteServerBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Delete server functionality
+    const deleteServerModal = new bootstrap.Modal(document.getElementById('deleteServerModal'));
+    let deleteServerId = null;
+
+    // Delete server button click handler
+    document.querySelectorAll('.delete-server-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            
+            deleteServerId = serverId;
+            document.getElementById('deleteServerDetails').textContent = serverName;
+            
+            deleteServerModal.show();
+        });
+    });
+
+    // Confirm delete server button click handler
+    document.getElementById('confirmDeleteServerBtn').addEventListener('click', async function() {
+        if (!deleteServerId) return;
+        
+        try {
+            const response = await fetch(`/djsql/api/servers/${deleteServerId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Close the modal and reload the page
+                deleteServerModal.hide();
+                window.location.reload();
+            } else {
+                alert(data.message || 'Error deleting server');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error deleting server: ' + error.message);
+        }
+    });
+
+    // Password visibility toggle
+    function togglePasswordVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        const button = input.nextElementSibling;
+        const icon = button.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+
+    // Add toggle password handlers
+    if (document.getElementById('togglePassword')) {
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            togglePasswordVisibility('serverPassword');
+        });
+    }
+
+    // Server form submission
+    if (document.getElementById('addServerForm')) {
+        document.getElementById('addServerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const errorDiv = form.querySelector('.alert-danger') || (() => {
+                const div = document.createElement('div');
+                div.className = 'alert alert-danger mt-3 d-none';
+                form.querySelector('.modal-body').appendChild(div);
+                return div;
+            })();
+            
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+            errorDiv.classList.add('d-none');
+            
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                });
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    throw new Error(`Server returned unexpected content: ${text}`);
+                }
+                
+                if (data.status === 'success') {
+                    // Close modal and reload page
+                    bootstrap.Modal.getInstance(document.getElementById('addServerModal')).hide();
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message || 'Failed to add server');
+                }
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('d-none');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+    }
+
+    // Edit server button handlers
+    document.querySelectorAll('.edit-server-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverData = JSON.parse(this.dataset.server);
+            
+            // Fill the edit form
+            document.getElementById('editServerId').value = serverId;
+            document.getElementById('editServerName').value = serverData.name;
+            document.getElementById('editServerHost').value = serverData.host;
+            document.getElementById('editServerPort').value = serverData.port;
+            document.getElementById('editServerUsername').value = serverData.username;
+            document.getElementById('editServerDescription').value = serverData.description;
+            document.getElementById('editServerActive').checked = serverData.is_active;
+            
+            // Show the modal
+            new bootstrap.Modal(document.getElementById('editServerModal')).show();
+        });
+    });
+
+    // Edit form submission
+    if (document.getElementById('editServerForm')) {
+        document.getElementById('editServerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const errorDiv = form.querySelector('.alert-danger') || (() => {
+                const div = document.createElement('div');
+                div.className = 'alert alert-danger mt-3 d-none';
+                form.querySelector('.modal-body').appendChild(div);
+                return div;
+            })();
+            
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+            errorDiv.classList.add('d-none');
+            
+            try {
+                const response = await fetch(`/djsql/api/servers/${form.elements.server_id.value}/edit/`, {
+                    method: 'POST',
+                    body: new FormData(form),
+                });
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    throw new Error(`Server returned unexpected content: ${text}`);
+                }
+                
+                if (data.status === 'success') {
+                    // Close modal and reload page
+                    bootstrap.Modal.getInstance(document.getElementById('editServerModal')).hide();
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message || 'Failed to update server');
+                }
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('d-none');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+    }
+
+    const modal = document.getElementById('databaseListModal') ? new bootstrap.Modal(document.getElementById('databaseListModal')) : null;
+    const detailsModal = document.getElementById('replicationDetailsModal') ? new bootstrap.Modal(document.getElementById('replicationDetailsModal')) : null;
+    const deleteConfirmModal = document.getElementById('deleteConfirmModal') ? new bootstrap.Modal(document.getElementById('deleteConfirmModal')) : null;
+    let deleteReplId = null;
+
+    const modalServerName = document.getElementById('modalServerName');
+    const databaseList = document.getElementById('databaseList');
+    const databaseListError = document.getElementById('databaseListError');
+    const databaseListSpinner = document.getElementById('databaseListSpinner');
+    const serverInfo = document.getElementById('serverInfo');
+    const databaseListContainer = document.getElementById('databaseListContainer');
+    const serverVersion = document.getElementById('serverVersion');
+    const serverThreads = document.getElementById('serverThreads');
+    const serverUptime = document.getElementById('serverUptime');
+    const serverCharset = document.getElementById('serverCharset');
+    const serverCollation = document.getElementById('serverCollation');
+
+    // Delete button click handler
+    document.querySelectorAll('.delete-repl-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const linkId = this.dataset.linkId;
+            const sourceName = this.dataset.sourceName;
+            const targetName = this.dataset.targetName;
+            
+            deleteReplId = linkId;
+            document.getElementById('deleteReplDetails').textContent = 
+                `${sourceName} → ${targetName}`;
+            
+            if (deleteConfirmModal) deleteConfirmModal.show();
+        });
+    });
+
+    // Confirm delete button click handler
+    if (document.getElementById('confirmDeleteBtn')) {
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+            if (!deleteReplId) return;
+            
+            try {
+                const response = await fetch(`/djsql/api/replication/${deleteReplId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Close the modal and reload the page
+                    if (deleteConfirmModal) deleteConfirmModal.hide();
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Error deleting replication');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting replication: ' + error.message);
+            }
+        });
+    }
+
+    // List databases button click handler
+    document.querySelectorAll('.list-databases-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+
+            if (document.getElementById('cleanReplicaBtn')) {
+                document.getElementById('cleanReplicaBtn').dataset.serverId = serverId;
+            }
+            
+            // Reset modal state
+            if (modalServerName) modalServerName.textContent = serverName;
+            if (databaseList) databaseList.innerHTML = '';
+            if (databaseListError) databaseListError.classList.add('d-none');
+            if (serverInfo) serverInfo.classList.add('d-none');
+            if (databaseListContainer) databaseListContainer.classList.add('d-none');
+            if (databaseListSpinner) databaseListSpinner.classList.remove('d-none');
+            
+            // Hide replication info on open
+            if (document.getElementById('replicationInfo')) {
+                document.getElementById('replicationInfo').classList.add('d-none');
+            }
+            if (document.getElementById('replicationDetails')) {
+                document.getElementById('replicationDetails').innerHTML = '';
+            }
+
+            if (modal) modal.show();
+
+            try {
+                const response = await fetch(`/djsql/api/servers/${serverId}/databases/`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Update server info
+                    if(serverVersion) serverVersion.textContent = data.version;
+                    if(serverThreads) serverThreads.textContent = data.connected_threads;
+                    if(serverUptime) serverUptime.textContent = formatUptime(data.uptime_seconds);
+                    if(serverCharset) serverCharset.textContent = data.character_set;
+                    if(serverCollation) serverCollation.textContent = data.collation;
+                    if(serverInfo) serverInfo.classList.remove('d-none');
+
+                    // Replication info
+                    const replicationInfo = document.getElementById('replicationInfo');
+                    const replicationDetails = document.getElementById('replicationDetails');
+                    if (replicationInfo && replicationDetails) {
+                        if (data.slave_status && Object.keys(data.slave_status).length > 0) {
+                            let html = '';
+                            if (data.slave_status.error) {
+                                html += `<p class='text-danger'><strong>Replication Error:</strong> ${data.slave_status.error}</p>`;
+                                if (data.slave_status.traceback && data.slave_status.traceback.trim() !== "") {
+                                    html += `<details><summary>Show traceback</summary><pre>${data.slave_status.traceback}</pre></details>`;
+                                }
+                            }
+                            if (data.slave_status.Master_Host) {
+                                html += `<p><strong>Master Host:</strong> ${data.slave_status.Master_Host}:${data.slave_status.Master_Port}</p>`;
+                            }
+                            if (data.slave_status.Slave_IO_Running || data.slave_status.Slave_SQL_Running) {
+                                html += `<p><strong>Slave IO Running:</strong> <span class="badge bg-${data.slave_status.Slave_IO_Running === 'Yes' ? 'success' : 'danger'}">${data.slave_status.Slave_IO_Running}</span><br>`;
+                                html += `<strong>Slave SQL Running:</strong> <span class="badge bg-${data.slave_status.Slave_SQL_Running === 'Yes' ? 'success' : 'danger'}">${data.slave_status.Slave_SQL_Running}</span></p>`;
+                            }
+                            if (data.slave_status.Seconds_Behind_Master !== undefined && data.slave_status.Seconds_Behind_Master !== null) {
+                                html += `<p><strong>Seconds Behind Master:</strong> ${data.slave_status.Seconds_Behind_Master}</p>`;
+                            }
+                            if (data.slave_status.Last_Error) {
+                                html += `<p class='text-danger'><strong>Last Error:</strong> ${data.slave_status.Last_Error}</p>`;
+                            }
+                            if (data.slave_status.Last_IO_Error) {
+                                html += `<p class='text-danger'><strong>Last IO Error:</strong> ${data.slave_status.Last_IO_Error}</p>`;
+                            }
+                            if (data.slave_status.Last_SQL_Error) {
+                                html += `<p class='text-danger'><strong>Last SQL Error:</strong> ${data.slave_status.Last_SQL_Error}</p>`;
+                            }
+                            if (!html) {
+                                html = '<p class="text-muted">Replication is enabled, but no detailed status is available.</p>';
+                            }
+                            replicationDetails.innerHTML = html;
+                            replicationInfo.classList.remove('d-none');
+                        } else {
+                            replicationDetails.innerHTML = '<span class="text-muted">Replication: Not configured on this server.</span>';
+                            replicationInfo.classList.remove('d-none');
+                        }
+                    }
+                    
+                    // Update database list
+                    if (databaseList) {
+                        databaseList.innerHTML = data.databases
+                            .map(db => `<li class="list-group-item">${db}</li>`)
+                            .join('');
+                    }
+                    if (databaseListContainer) databaseListContainer.classList.remove('d-none');
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                if (databaseListError) {
+                    databaseListError.textContent = `Error: ${error.message}`;
+                    databaseListError.classList.remove('d-none');
+                }
+            } finally {
+                if (databaseListSpinner) databaseListSpinner.classList.add('d-none');
+            }
+        });
+    });
+
+    // View Details button click handler
+    document.querySelectorAll('.view-details-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const linkId = this.dataset.linkId;
+            loadReplicationDetails(linkId);
+            if (detailsModal) detailsModal.show();
+        });
+    });
+
+    // Refresh button click handler
+    if (document.getElementById('refreshDetailsBtn')) {
+        document.getElementById('refreshDetailsBtn').addEventListener('click', function() {
+            const linkId = document.querySelector('.view-details-btn[data-link-id]').dataset.linkId;
+            loadReplicationDetails(linkId);
+        });
+    }
+
+    // Helper functions
+    function getCSRFToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        return token;
+    }
+
+    function formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        const parts = [];
+        if (days > 0) parts.push(`${days} days`);
+        if (hours > 0) parts.push(`${hours} hours`);
+        if (minutes > 0) parts.push(`${minutes} minutes`);
+        
+        return parts.join(', ') || 'Less than a minute';
+    }
+
+    async function loadReplicationDetails(linkId) {
+        console.log('Loading replication details for link:', linkId);
+        
+        const spinner = document.getElementById('replicationDetailsSpinner');
+        const details = document.getElementById('replicationDetails');
+        const error = document.getElementById('replicationError');
+        
+        // Reset modal state
+        if (spinner) spinner.classList.remove('d-none');
+        if (details) {
+            details.classList.add('d-none');
+        }
+        if (error) {
+            error.classList.add('d-none');
+            error.textContent = '';
+        }
+        
+        if (!spinner || !details) {
+            console.error('Critical modal elements missing');
+            if (error) {
+                error.textContent = 'Critical modal elements missing';
+                error.classList.remove('d-none');
+            }
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/djsql/api/replication/${linkId}/status/`);
+            const data = await response.json();
+            
+            if (spinner) spinner.classList.add('d-none');
+            if (details) details.classList.remove('d-none');
+            
+            if (data.status === 'success') {
+                // Populate the modal with new data
+                document.getElementById('sourceHost').textContent = data.replication.source?.host || 'N/A';
+                document.getElementById('sourcePort').textContent = data.replication.source?.port || 'N/A';
+                document.getElementById('sourceUser').textContent = data.replication.user || 'N/A';
+                document.getElementById('sourceBinlog').textContent = data.replication.binlog_info?.file || 'N/A';
+
+                document.getElementById('targetHost').textContent = data.replication.target?.host || 'N/A';
+                document.getElementById('targetPort').textContent = data.replication.target?.port || 'N/A';
+                document.getElementById('replStatus').textContent = data.replication.status || 'Unknown';
+                document.getElementById('replLag').textContent = data.replication.lag_seconds ? `${data.replication.lag_seconds}s` : 'N/A';
+
+                const dbList = document.getElementById('replDatabases');
+                dbList.innerHTML = (data.replication.databases || []).map(db => `
+                    <li>
+                        ${db}
+                        <button class="btn btn-sm btn-outline-danger unlink-db-btn" data-link-id="${linkId}" data-db-name="${db}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </li>
+                `).join('');
+
+                document.getElementById('replUser').textContent = data.replication.user || 'N/A';
+                document.getElementById('replError').textContent = data.replication.error_message || data.replication.last_error || 'None';
+
+                const slaveStatusBody = document.getElementById('slaveStatusTable').querySelector('tbody');
+                slaveStatusBody.innerHTML = Object.entries(data.replication.slave_status || {}).map(([key, value]) => `
+                    <tr>
+                        <td>${key}</td>
+                        <td>${formatSlaveStatusValue(key, value)}</td>
+                    </tr>
+                `).join('');
+
+                const logsBody = document.getElementById('replLogs');
+                logsBody.innerHTML = data.logs.map(log => `
+                    <tr class="${log.is_error ? 'table-danger' : ''}">
+                        <td>${new Date(log.timestamp).toLocaleString()}</td>
+                        <td>${log.step}</td>
+                        <td>${log.status}</td>
+                        <td>
+                            ${log.message}
+                            ${log.command_to_run ? `<pre class="mt-1 mb-0 small">${log.command_to_run}</pre>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (e) {
+            if (error) {
+                error.textContent = `Error loading details: ${e.message}`;
+                error.classList.remove('d-none');
+            }
+        }
+    }
+
+    function formatSlaveStatusValue(key, value) {
+        if (value === 'Yes') return '<span class="badge bg-success">Yes</span>';
+        if (value === 'No') return '<span class="badge bg-danger">No</span>';
+        if (value === null || value === '') return '<span class="text-muted">N/A</span>';
+        if (key.includes('Error') && value) return `<span class="text-danger">${value}</span>`;
+        if (key === 'Seconds_Behind_Master') return `<strong>${value} seconds</strong>`;
+        return value;
+    }
+
+    // Unlink database button click handler (event delegation)
+    document.getElementById('replicationDetailsModal').addEventListener('click', async function(e) {
+        if (e.target.closest('.unlink-db-btn')) {
+            const button = e.target.closest('.unlink-db-btn');
+            const linkId = button.dataset.linkId;
+            const dbName = button.dataset.dbName;
+
+            if (!confirm(`Are you sure you want to unlink the database "${dbName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/djsql/api/replication/${linkId}/unlink_database/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ database: dbName })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert(data.message);
+                    loadReplicationDetails(linkId); // Refresh the modal
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                alert(`Error unlinking database: ${error.message}`);
+            }
+        }
+    });
+
+    // Clean replica button click handler
+    if (document.getElementById('cleanReplicaBtn')) {
+        document.getElementById('cleanReplicaBtn').addEventListener('click', async function() {
+            const serverId = this.dataset.serverId;
+            if (!serverId) {
+                alert('Could not determine the server ID.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to clean the replica? This will stop and reset the replication state.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/djsql/api/servers/${serverId}/clean/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert(data.message);
+                    if (modal) modal.hide();
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                alert(`Error cleaning replica: ${error.message}`);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

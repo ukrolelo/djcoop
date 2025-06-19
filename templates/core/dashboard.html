@@ -1,0 +1,88 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">System Status</h5>
+                <div class="alert alert-success mb-3">
+                    All systems operational
+                </div>
+                <div class="d-grid">
+                    <a href="{% url 'core:settings' %}" class="btn btn-primary">Manage Settings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">SQL Status</h5>
+                <div class="alert alert-success mb-3">
+                    Connected and running
+                </div>
+                <div class="d-grid">
+                    <a href="{% url 'core:djsql' %}" class="btn btn-primary">View SQL Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Quick Stats</h5>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <strong>Uptime:</strong> 3 days, 2 hours
+                    </li>
+                    <li class="mb-2">
+                        <strong>Database Size:</strong> 256 MB
+                    </li>
+                    <li class="mb-2">
+                        <strong>Active Connections:</strong> 3
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">System Activity</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2024-02-16 14:45:23</td>
+                                <td>Database backup completed</td>
+                                <td><span class="badge bg-success">Success</span></td>
+                            </tr>
+                            <tr>
+                                <td>2024-02-16 14:40:00</td>
+                                <td>System check performed</td>
+                                <td><span class="badge bg-success">Success</span></td>
+                            </tr>
+                            <tr>
+                                <td>2024-02-16 14:30:00</td>
+                                <td>Configuration updated</td>
+                                <td><span class="badge bg-success">Success</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Application Settings</h5>
+                <form>
+                    <div class="mb-3">
+                        <label for="app_name" class="form-label">Application Name</label>
+                        <input type="text" class="form-control" id="app_name" value="DjCoop">
+                    </div>
+                    <div class="mb-3">
+                        <label for="debug_mode" class="form-label">Debug Mode</label>
+                        <select class="form-select" id="debug_mode">
+                            <option value="true">Enabled</option>
+                            <option value="false">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="log_level" class="form-label">Log Level</label>
+                        <select class="form-select" id="log_level">
+                            <option value="DEBUG">Debug</option>
+                            <option value="INFO">Info</option>
+                            <option value="WARNING">Warning</option>
+                            <option value="ERROR">Error</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Application Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">MySQL Configuration</h5>
+                <form>
+                    <div class="mb-3">
+                        <label for="host" class="form-label">Host</label>
+                        <input type="text" class="form-control" id="host" placeholder="localhost">
+                    </div>
+                    <div class="mb-3">
+                        <label for="port" class="form-label">Port</label>
+                        <input type="text" class="form-control" id="port" placeholder="3306">
+                    </div>
+                    <div class="mb-3">
+                        <label for="database" class="form-label">Database</label>
+                        <input type="text" class="form-control" id="database">
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save MySQL Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

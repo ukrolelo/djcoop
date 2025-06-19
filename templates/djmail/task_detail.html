@@ -1,0 +1,133 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Task: {{ task.title }}</h3>
+            <div>
+                <a href="{% url 'djmail:tasks' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Tasks
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Task Details -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Task Details</h5>
+                    <div>
+                        <span class="badge {% if task.status == 'completed' %}bg-success{% elif task.status == 'in_progress' %}bg-primary{% elif task.status == 'deferred' %}bg-secondary{% else %}bg-light text-dark{% endif %} me-2">
+                            {{ task.get_status_display }}
+                        </span>
+                        <span class="badge {% if task.priority == 'high' or task.priority == 'urgent' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
+                            {{ task.get_priority_display }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Created:</strong> {{ task.created_at|date:"F j, Y, H:i" }}
+                </div>
+                
+                {% if task.due_date %}
+                <div class="mb-3">
+                    <strong>Due Date:</strong> {{ task.due_date|date:"F j, Y, H:i" }}
+                </div>
+                {% endif %}
+                
+                {% if task.completed_at %}
+                <div class="mb-3">
+                    <strong>Completed:</strong> {{ task.completed_at|date:"F j, Y, H:i" }}
+                </div>
+                {% endif %}
+                
+                {% if task.related_email %}
+                <div class="mb-3">
+                    <strong>Related Email:</strong> 
+                    <a href="{% url 'djmail:email_detail' task.related_email.id %}">
+                        {{ task.related_email.subject|default:"(No Subject)" }}
+                    </a>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <strong>Description:</strong>
+                    <div class="border rounded p-3 mt-2 bg-light">
+                        {% if task.description %}
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ task.description }}</pre>
+                        {% else %}
+                            <p class="mb-0 text-muted">No description provided</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if task.status != 'completed' %}
+                <form method="post" action="{% url 'djmail:task_status_update' task.id %}" class="mt-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="completed">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Mark as Completed
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Task Form -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Edit Task</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_title" class="form-label">Task Title</label>
+                        {{ form.title }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_priority" class="form-label">Priority</label>
+                        {{ form.priority }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_status" class="form-label">Status</label>
+                        {{ form.status }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_due_date" class="form-label">Due Date</label>
+                        {{ form.due_date }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_related_email" class="form-label">Related Email</label>
+                        {{ form.related_email }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label">Description</label>
+                        {{ form.description }}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Update Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
