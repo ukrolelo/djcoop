@@ -4,6 +4,6 @@
 
 ## MariaDB SQL Replication Setup
 
-The first part of this project focuses on setting up MariaDB SQL replication.
+The first part of this project focuses on setting up MariaDB SQL replication between servers.
 
 This initial part of the project was built with the assistance of [`refact.ai "CUDOS Refact Team"`](https://refact.ai/).
