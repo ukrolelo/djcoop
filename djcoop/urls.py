@@ -11,7 +11,7 @@ urlpatterns = [
     # Add core URLs
     path('dashboard/', include('core.urls')),
     # Add djsql URLs
-    path('djsql/', include('djsql.urls')),
+    path('djsql/', include('djsql.urls', namespace='djsql')),
     # Add djmail URLs
     path('mail/', include('djmail.urls')),
 ]

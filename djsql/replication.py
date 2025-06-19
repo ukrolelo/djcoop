@@ -419,10 +419,6 @@ class MySQLReplicationHelper:
 
                 if databases:
                     db_list_str = ','.join(databases)
-                    print(f"{db_list_str}")
-                    print(f"{db_list_str}")
-                    print(f"{db_list_str}")
-                    print(f"{db_list_str}")
                     if is_mariadb:
                         filter_sql = f"SET GLOBAL replicate_do_db = '{db_list_str}'"
                     else:
