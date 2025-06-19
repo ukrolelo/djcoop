@@ -108,4 +108,4 @@ After setting up the MariaDB demo servers, you can run the Django application. N
     ```
     These commands will prepare your Django application's database schema.
 
-This initial part of the project was built with the assistance of [`refact.ai "CUDOS Refact Team"`](https://refact.ai/).
+This initial part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).
