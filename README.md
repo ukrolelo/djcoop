@@ -6,7 +6,27 @@
 
 The first part of this project focuses on setting up MariaDB SQL replication between servers.
 
-### Testing with Demo Servers (Docker Compose)
+
+
+#### Django Application Setup
+
+Run the Django application. Navigate to the root `djcoop` directory and execute the following commands:
+
+1.  **Run Django Development Server:**
+    ```bash
+    python manage.py runserver
+    ```
+2.  **Apply Database Migrations:**
+    ```bash
+    python manage.py makemigrations
+    python manage.py migrate
+    ```
+    These commands will prepare your Django application's database schema.
+
+**This initial part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).**
+
+
+### Example Testing with Demo Servers (Docker Compose)
 
 The `docker-examples` folder contains configurations for two MariaDB servers (`dbserver1` and `dbserver2`) designed to demonstrate replication.
 
@@ -92,20 +112,3 @@ collation-server = utf8mb4_general_ci
 *   **`server-id = 1` (for `dbserver1`)**: Each server in a replication topology must have a unique `server-id`. `dbserver1` uses `1`, and `dbserver2` (not shown here, but configured similarly in its `my-custom.cnf`) uses `10` to ensure distinct identification within the replication setup.
 *   **`binlog_format = ROW`**: Specifies the format for binary logging, `ROW` is generally recommended for safety and consistency in replication.
 *   **`character-set-server = utf8mb4`** and **`collation-server = utf8mb4_general_ci`**: Set the default character set and collation for the server.
-
-#### Django Application Setup
-
-After setting up the MariaDB demo servers, you can run the Django application. Navigate to the root `djcoop` directory and execute the following commands:
-
-1.  **Run Django Development Server:**
-    ```bash
-    python manage.py runserver
-    ```
-2.  **Apply Database Migrations:**
-    ```bash
-    python manage.py makemigrations
-    python manage.py migrate
-    ```
-    These commands will prepare your Django application's database schema.
-
-This initial part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).
