@@ -25,6 +25,17 @@ Run the Django application. Navigate to the root `djcoop` directory and execute 
 
 **This first part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).**
 
+### Screenshots
+
+![Screenshot 1](static/img/screenshots/screen1.png)
+![Screenshot 2](static/img/screenshots/screen2.png)
+![Screenshot 3](static/img/screenshots/screen3.png)
+![Screenshot 4](static/img/screenshots/screen4.png)
+![Screenshot 5](static/img/screenshots/screen5.png)
+![Screenshot 6](static/img/screenshots/screen6.png)
+![Screenshot 7](static/img/screenshots/screen7.png)
+![Screenshot 8](static/img/screenshots/screen8.png)
+
 
 ### Example Testing with Demo Servers (Docker Compose)
 
