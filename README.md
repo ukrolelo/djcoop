@@ -1,4 +1,4 @@
-# djcoop
+# Djcoop project that consist of several apps that help me in IT work
 
 This is a beta project designed to simplify IT work.
 
