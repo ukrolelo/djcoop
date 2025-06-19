@@ -1,6 +1,6 @@
 # Djcoop project that consist of several apps that help me in IT work
 
-![MariaDB SQL Replication Setup](static/img/djcoop_gh_1.png)
+![MariaDB SQL Replication Setup](static/img/djcoop_gh_1_tr.png)
 
 ## MariaDB SQL Replication Setup
 
