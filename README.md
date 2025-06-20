@@ -23,7 +23,10 @@ Run the Django application. Navigate to the root `djcoop` directory and execute 
     ```
     These commands will prepare your Django application's database schema.
 
+
+
 **This first part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).**
+
 
 ### Screenshots
 

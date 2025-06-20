@@ -5,7 +5,7 @@ class DatabaseServer(models.Model):
     host = models.CharField(max_length=255)
     port = models.IntegerField(default=3306)
     username = models.CharField(max_length=100)
-    password = models.CharField(max_length=255)
+    password = models.CharField(max_length=255) # Reverted to CharField
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -28,7 +28,7 @@ class DatabaseUser(models.Model):
 
     server = models.ForeignKey(DatabaseServer, on_delete=models.CASCADE, related_name='users')
     username = models.CharField(max_length=100)
-    password = models.CharField(max_length=255)
+    password = models.CharField(max_length=255) # Reverted to CharField
     host = models.CharField(max_length=255, default='%')
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
     privileges = models.JSONField(default=list)
@@ -64,7 +64,7 @@ class ReplicationLink(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     lag_seconds = models.IntegerField(default=0)
     replication_user = models.CharField(max_length=100, blank=True)
-    replication_password = models.CharField(max_length=255, blank=True)
+    replication_password = models.CharField(max_length=255, blank=True) # Reverted to CharField
     server_id_source = models.IntegerField(null=True, blank=True)
     server_id_target = models.IntegerField(null=True, blank=True)
     error_message = models.TextField(blank=True)

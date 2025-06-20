@@ -261,3 +261,14 @@ a:hover {
   background-color: #ffffff !important; /* Solid white with 0% transparency */
 }
 
+/* Style for disabled user rows in step 2 */
+.disabled-user {
+  color: #6c757d; /* Gray out the text */
+  background-color: #f8f9fa; /* Light gray background */
+  opacity: 0.7; /* Slightly reduce opacity */
+  pointer-events: none; /* Disable pointer events */
+}
+
+.disabled-user input[type="radio"] {
+  cursor: not-allowed;
+}

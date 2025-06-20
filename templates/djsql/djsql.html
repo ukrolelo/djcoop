@@ -56,8 +56,8 @@
                                 </td>
                                 <td>
                                     {% with slave_status=server_statuses|get_item:link.target.id|get_item:'slave_status' %}
-                                        <span class="badge {% if slave_status and slave_status.Slave_IO_Running == 'Yes' and slave_status.Slave_SQL_Running == 'Yes' %}bg-success{% else %}bg-danger{% endif %}">
-                                            {% if slave_status and slave_status.Slave_IO_Running == 'Yes' and slave_status.Slave_SQL_Running == 'Yes' %}
+                                        <span class="badge {% if slave_status and not slave_status.is_error %}bg-success{% else %}bg-danger{% endif %}">
+                                            {% if slave_status and not slave_status.is_error %}
                                                 Active
                                             {% else %}
                                                 Error
@@ -248,7 +248,7 @@
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="card-subtitle mb-0 text-muted">Status Information</h6>
                                 <div>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" id="refreshDetailsBtn">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="refreshDetailsBtnTop">
                                         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
@@ -326,7 +326,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="refreshDetailsBtn">Refresh</button>
+                <button type="button" class="btn btn-primary" id="refreshDetailsBtnBottom">Refresh</button>
             </div>
         </div>
     </div>
@@ -524,11 +524,106 @@
     </div>
 </div>
 
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastBody">
+            Hello, world! This is a toast message.
+        </div>
+    </div>
+</div>
+
+<!-- Generic Confirmation Modal -->
+<div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="genericConfirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="genericConfirmModalBody">
+                Are you sure you want to proceed?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="genericConfirmModalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Toast Notification Function
+    function showToast(message, type = 'info') {
+        const toastLiveExample = document.getElementById('liveToast');
+        const toastBody = document.getElementById('toastBody');
+        const toastTitle = document.getElementById('toastTitle');
+        const toast = new bootstrap.Toast(toastLiveExample);
+
+        toastBody.textContent = message;
+        toastTitle.textContent = type.charAt(0).toUpperCase() + type.slice(1); // Capitalize first letter
+
+        // Set header background based on type
+        toastLiveExample.className = 'toast'; // Reset classes
+        toastLiveExample.classList.add(`text-bg-${type}`); // Add new background class
+
+        toast.show();
+    }
+
+    // Generic Confirmation Modal Function
+    let confirmCallback = null;
+    let cancelCallback = null;
+
+    const genericConfirmModalElement = document.getElementById('genericConfirmModal');
+    const genericConfirmModal = genericConfirmModalElement ? new bootstrap.Modal(genericConfirmModalElement) : null;
+    const genericConfirmModalTitle = document.getElementById('genericConfirmModalTitle');
+    const genericConfirmModalBody = document.getElementById('genericConfirmModalBody');
+    const genericConfirmModalConfirmBtn = document.getElementById('genericConfirmModalConfirmBtn');
+
+    if (genericConfirmModal) {
+        genericConfirmModalConfirmBtn.addEventListener('click', () => {
+            if (confirmCallback) {
+                confirmCallback();
+            }
+            genericConfirmModal.hide();
+        });
+
+        genericConfirmModalElement.addEventListener('hidden.bs.modal', () => {
+            if (cancelCallback) {
+                cancelCallback();
+            }
+            confirmCallback = null;
+            cancelCallback = null;
+        });
+    }
+
+    function showConfirmationModal(title, message, onConfirm, onCancel = null) {
+        if (genericConfirmModal) {
+            genericConfirmModalTitle.textContent = title;
+            genericConfirmModalBody.textContent = message;
+            confirmCallback = onConfirm;
+            cancelCallback = onCancel;
+            genericConfirmModal.show();
+        } else {
+            // If modal cannot be initialized, log an error and do not proceed with action
+            console.error('Bootstrap confirmation modal not initialized. Cannot show confirmation.');
+            // Optionally, you could show a toast here instead of a native alert
+            showToast('A confirmation dialog could not be displayed. Please refresh the page.', 'danger');
+            if (onCancel) { // Still call onCancel if it exists, as the action is not confirmed
+                onCancel();
+            }
+        }
+    }
+
+    // Original code starts here
     // Delete server functionality
     const deleteServerModal = new bootstrap.Modal(document.getElementById('deleteServerModal'));
     let deleteServerId = null;
@@ -565,12 +660,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Close the modal and reload the page
                 deleteServerModal.hide();
                 window.location.reload();
+                showToast(data.message || 'Server deleted successfully', 'success');
             } else {
-                alert(data.message || 'Error deleting server');
+                showToast(data.message || 'Error deleting server', 'danger');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error deleting server: ' + error.message);
+            showToast('Error deleting server: ' + error.message, 'danger');
         }
     });
 
@@ -637,12 +733,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Close modal and reload page
                     bootstrap.Modal.getInstance(document.getElementById('addServerModal')).hide();
                     window.location.reload();
+                    showToast(data.message || 'Server added successfully', 'success');
                 } else {
-                    throw new Error(data.message || 'Failed to add server');
+                    showToast(data.message || 'Failed to add server', 'danger');
                 }
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.classList.remove('d-none');
+                showToast(error.message, 'danger');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
@@ -709,12 +807,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Close modal and reload page
                     bootstrap.Modal.getInstance(document.getElementById('editServerModal')).hide();
                     window.location.reload();
+                    showToast(data.message || 'Server updated successfully', 'success');
                 } else {
-                    throw new Error(data.message || 'Failed to update server');
+                    showToast(data.message || 'Failed to update server', 'danger');
                 }
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.classList.remove('d-none');
+                showToast(error.message, 'danger');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
@@ -774,12 +874,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Close the modal and reload the page
                     if (deleteConfirmModal) deleteConfirmModal.hide();
                     window.location.reload();
+                    showToast(data.message || 'Replication deleted successfully', 'success');
                 } else {
-                    alert(data.message || 'Error deleting replication');
+                    showToast(data.message || 'Error deleting replication', 'danger');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error deleting replication: ' + error.message);
+                showToast('Error deleting replication: ' + error.message, 'danger');
             }
         });
     }
@@ -897,9 +998,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Refresh button click handler
-    if (document.getElementById('refreshDetailsBtn')) {
-        document.getElementById('refreshDetailsBtn').addEventListener('click', function() {
+    // Refresh button click handler (top)
+    if (document.getElementById('refreshDetailsBtnTop')) {
+        document.getElementById('refreshDetailsBtnTop').addEventListener('click', function() {
+            const linkId = document.querySelector('.view-details-btn[data-link-id]').dataset.linkId;
+            loadReplicationDetails(linkId);
+        });
+    }
+
+    // Refresh button click handler (bottom)
+    if (document.getElementById('refreshDetailsBtnBottom')) {
+        document.getElementById('refreshDetailsBtnBottom').addEventListener('click', function() {
             const linkId = document.querySelector('.view-details-btn[data-link-id]').dataset.linkId;
             loadReplicationDetails(linkId);
         });
@@ -1030,31 +1139,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const linkId = button.dataset.linkId;
             const dbName = button.dataset.dbName;
 
-            if (!confirm(`Are you sure you want to unlink the database "${dbName}"?`)) {
-                return;
-            }
+            showConfirmationModal(
+                'Unlink Database',
+                `Are you sure you want to unlink the database "${dbName}"?`,
+                async () => {
+                    try {
+                        const response = await fetch(`/djsql/api/replication/${linkId}/unlink_database/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCSRFToken()
+                            },
+                            body: JSON.stringify({ database: dbName })
+                        });
 
-            try {
-                const response = await fetch(`/djsql/api/replication/${linkId}/unlink_database/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({ database: dbName })
-                });
+                        const data = await response.json();
 
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    alert(data.message);
-                    loadReplicationDetails(linkId); // Refresh the modal
-                } else {
-                    throw new Error(data.message);
+                        if (data.status === 'success') {
+                            showToast(data.message, 'success');
+                            // Close the modal and reload the page
+                            if (detailsModal) detailsModal.hide();
+                            window.location.reload();
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                    } catch (error) {
+                        showToast(`Error unlinking database: ${error.message}`, 'danger');
+                    }
                 }
-            } catch (error) {
-                alert(`Error unlinking database: ${error.message}`);
-            }
+            );
         }
     });
 
@@ -1063,35 +1176,37 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('cleanReplicaBtn').addEventListener('click', async function() {
             const serverId = this.dataset.serverId;
             if (!serverId) {
-                alert('Could not determine the server ID.');
+                showToast('Could not determine the server ID.', 'danger');
                 return;
             }
 
-            if (!confirm('Are you sure you want to clean the replica? This will stop and reset the replication state.')) {
-                return;
-            }
+            showConfirmationModal(
+                'Clean Replica',
+                'Are you sure you want to clean the replica? This will stop and reset the replication state.',
+                async () => {
+                    try {
+                        const response = await fetch(`/djsql/api/servers/${serverId}/clean/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCSRFToken()
+                            }
+                        });
 
-            try {
-                const response = await fetch(`/djsql/api/servers/${serverId}/clean/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            showToast(data.message, 'success');
+                            if (modal) modal.hide();
+                            window.location.reload();
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                    } catch (error) {
+                        showToast(`Error cleaning replica: ${error.message}`, 'danger');
                     }
-                });
-
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    alert(data.message);
-                    if (modal) modal.hide();
-                    window.location.reload();
-                } else {
-                    throw new Error(data.message);
                 }
-            } catch (error) {
-                alert(`Error cleaning replica: ${error.message}`);
-            }
+            );
         });
     }
 });

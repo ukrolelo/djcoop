@@ -446,6 +446,10 @@ class MySQLReplicationHelper:
                 if not result:
                     return None
                 
+                # Ensure Replicate_Do_DB is an empty string if it's None or N/A
+                if result.get('Replicate_Do_DB') is None or result.get('Replicate_Do_DB') == 'N/A':
+                    result['Replicate_Do_DB'] = ''
+
                 # Check for errors and add to the result if found
                 if result.get('Last_Error'):
                     result['error'] = result['Last_Error']

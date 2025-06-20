@@ -1,6 +1,9 @@
 # Ignore database file
 db.sqlite3
 
+# Ignore encryption key
+.encryption_key
+
 # Ignore node_modules directory
 node_modules/
 

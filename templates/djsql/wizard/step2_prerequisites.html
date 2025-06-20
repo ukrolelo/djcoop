@@ -51,13 +51,17 @@
                                         </thead>
                                         <tbody>
                                             {% for user in source.users %}
-                                            <tr>
+                                            <tr {% if not user.app_created %}class="disabled-user"{% endif %}>
                                                 <td>
+                                                    {% if user.app_created %}
                                                     <input type="radio" 
                                                            name="source_user" 
                                                            class="form-check-input"
                                                            value="{{ user.user }}@{{ user.host }}"
                                                            {% if not user.sufficient %}disabled{% endif %}>
+                                                    {% else %}
+                                                    -
+                                                    {% endif %}
                                                 </td>
                                                 <td>{{ user.user }}</td>
                                                 <td>{{ user.host }}</td>
@@ -142,13 +146,17 @@
                                         </thead>
                                         <tbody>
                                             {% for user in target.users %}
-                                            <tr>
+                                            <tr {% if not user.app_created %}class="disabled-user"{% endif %}>
                                                 <td>
+                                                    {% if user.app_created %}
                                                     <input type="radio" 
                                                            name="target_user" 
                                                            class="form-check-input"
                                                            value="{{ user.user }}@{{ user.host }}"
                                                            {% if not user.sufficient %}disabled{% endif %}>
+                                                    {% else %}
+                                                    -
+                                                    {% endif %}
                                                 </td>
                                                 <td>{{ user.user }}</td>
                                                 <td>{{ user.host }}</td>

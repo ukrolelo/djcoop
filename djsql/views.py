@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from .models import DatabaseServer, ReplicationLink, ReplicationSetupLog, DatabaseUser
+from .models import DatabaseServer, ReplicationLink, ReplicationSetupLog, DatabaseUser # Import DatabaseUser
 from django.core.exceptions import ObjectDoesNotExist
 from .forms import DatabaseServerForm
 import logging
@@ -15,6 +15,7 @@ import string
 import tempfile
 import os
 import subprocess
+from .utils import encrypt_data, decrypt_data # Import encryption utilities
 
 try:
     from djsql.replication import MySQLReplicationHelper, ReplicationError
@@ -56,13 +57,14 @@ def generate_password(length=16):
     alphabet = string.ascii_letters + string.digits + '!@#$%^&*'
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
-def test_connection(host, port, user, password, timeout=5):
+def test_connection(host, port, user, encrypted_password, timeout=5): # Renamed password to encrypted_password
+    decrypted_password = decrypt_data(encrypted_password) # Decrypt password
     try:
         connection = mysql.connector.connect(
             host=host,
             port=port,
             user=user,
-            password=password,
+            password=decrypted_password, # Use decrypted password
             connection_timeout=timeout,
             charset='utf8mb4',
             collation='utf8mb4_unicode_ci'
@@ -102,12 +104,15 @@ def add_server(request):
         form = DatabaseServerForm(request.POST)
         if form.is_valid():
             try:
-                # Test connection before saving
+                # Encrypt password before testing connection and saving
+                plain_password = form.cleaned_data['password']
+                encrypted_password = encrypt_data(plain_password)
+                
                 is_connected, error, _, _, _ = test_connection(
                     form.cleaned_data['host'],
                     form.cleaned_data['port'],
                     form.cleaned_data['username'],
-                    form.cleaned_data['password']
+                    encrypted_password # Pass encrypted password to test_connection
                 )
                 
                 if not is_connected:
@@ -116,7 +121,10 @@ def add_server(request):
                         'message': f'Connection test failed: {error}'
                     })
                 
-                server = form.save()
+                server = form.save(commit=False) # Don't save yet
+                server.password = encrypted_password # Set encrypted password
+                server.save() # Now save
+                
                 logger.debug(f"Server saved: {server}")
                 return JsonResponse({
                     'status': 'success',
@@ -140,21 +148,40 @@ def edit_server(request, server_id):
         if request.method == 'POST':
             form = DatabaseServerForm(request.POST, instance=server)
             if form.is_valid():
-                # If password is empty, keep the old one
-                if not form.cleaned_data['password']:
-                    form.cleaned_data['password'] = server.password
+                # Get current encrypted password
+                old_encrypted_password = server.password
+                
+                # Get new password from form
+                new_plain_password = form.cleaned_data['password']
+                
+                # Determine password to use for connection test and saving
+                password_for_test = ""
+                password_to_save = ""
+
+                if new_plain_password:
+                    # New password provided, encrypt it
+                    password_to_save = encrypt_data(new_plain_password)
+                    password_for_test = new_plain_password # Test with plain text before encryption
+                else:
+                    # Password field is empty, retain old encrypted password
+                    password_to_save = old_encrypted_password
+                    password_for_test = decrypt_data(old_encrypted_password) # Decrypt for test
                 
                 # Test connection if credentials changed
+                # Note: form.cleaned_data['password'] will be the plain text if provided, or empty string
+                # We need to compare with the *decrypted* old password for accurate change detection
+                old_plain_password_for_comparison = decrypt_data(old_encrypted_password)
+
                 if (form.cleaned_data['host'] != server.host or
                     form.cleaned_data['port'] != server.port or
                     form.cleaned_data['username'] != server.username or
-                    form.cleaned_data['password'] != server.password):
+                    new_plain_password != old_plain_password_for_comparison): # Compare plain text passwords
                     
                     is_connected, error, _, _, _ = test_connection(
                         form.cleaned_data['host'],
                         form.cleaned_data['port'],
                         form.cleaned_data['username'],
-                        form.cleaned_data['password']
+                        password_to_save # Pass the encrypted password to test_connection
                     )
                     
                     if not is_connected:
@@ -163,7 +190,10 @@ def edit_server(request, server_id):
                             'message': f'Connection test failed: {error}'
                         })
                 
-                server = form.save()
+                server = form.save(commit=False) # Don't save yet
+                server.password = password_to_save # Set the determined password (encrypted)
+                server.save() # Now save
+                
                 return JsonResponse({
                     'status': 'success',
                     'server_id': server.id
@@ -220,7 +250,7 @@ def djsql(request):
                 server.host,
                 server.port,
                 server.username,
-                server.password
+                server.password # This is already encrypted
             )
             
             slave_status = None
@@ -230,17 +260,26 @@ def djsql(request):
                         server.host,
                         server.port,
                         server.username,
-                        server.password
+                        decrypt_data(server.password) # Decrypt password for helper
                     )
                     slave_status = helper.check_slave_status()
                     if not slave_status:
                         slave_status = {'is_error': True, 'Last_Error': 'No replication status found.'}
-                    elif slave_status.get('Slave_IO_Running') == 'Yes' and slave_status.get('Slave_SQL_Running') == 'Yes':
-                        # The replication is active
-                        pass
                     else:
-                        # The replication is not running correctly
-                        slave_status['is_error'] = True
+                        # Determine if there's an error based on multiple conditions
+                        is_io_sql_running = (slave_status.get('Slave_IO_Running') == 'Yes' and
+                                             slave_status.get('Slave_SQL_Running') == 'Yes')
+                        is_replicate_do_db_empty = (slave_status.get('Replicate_Do_DB') == '')
+
+                        if not is_io_sql_running:
+                            slave_status['is_error'] = True
+                            slave_status['Last_Error'] = slave_status.get('Last_Error') or 'Replication IO or SQL thread is not running.'
+                        elif is_replicate_do_db_empty:
+                            slave_status['is_error'] = True
+                            slave_status['Last_Error'] = slave_status.get('Last_Error') or 'Replication is active but no databases are configured for replication (Replicate_Do_DB is empty).'
+                        else:
+                            slave_status['is_error'] = False
+                            slave_status['Last_Error'] = slave_status.get('Last_Error') or 'Replication is running correctly.'
 
                     if slave_status and 'Master_Host' in slave_status:
                         try:
@@ -293,9 +332,8 @@ def list_databases(request, server_id):
             server.host, 
             server.port, 
             server.username, 
-            server.password
+            server.password # This is already encrypted
         )
-        
         if not is_connected:
             return JsonResponse({
                 'status': 'error',
@@ -303,25 +341,27 @@ def list_databases(request, server_id):
             }, status=500)
         
         # If connection test passed, get databases
-        connection = mysql.connector.connect(
-            host=server.host,
-            port=server.port,
-            user=server.username,
-            password=server.password,
-            connection_timeout=5,
-            charset='utf8mb4',
-            collation='utf8mb4_unicode_ci'
-        )
-        
-        cursor = connection.cursor()
-        
+        connection = None
+        cursor = None
         try:
+            connection = mysql.connector.connect(
+                host=server.host,
+                port=server.port,
+                user=server.username,
+                password=decrypt_data(server.password), # Decrypt password for connection
+                connection_timeout=5,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
+            
+            cursor = connection.cursor()
+            
             try:
                 cursor.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
             except mysql.connector.Error as err:
                 if err.errno == 1273:  # Unknown collation error
                     cursor.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_general_ci'")
-            
+                
             # Get list of databases
             cursor.execute("SHOW DATABASES")
             databases = [db[0] for db in cursor.fetchall() if db[0] not in ['information_schema', 'performance_schema', 'mysql', 'sys']]
@@ -339,12 +379,11 @@ def list_databases(request, server_id):
             charset_vars = dict(cursor.fetchall())
 
             # Get slave status (replication info)
-            # Get slave status (replication info)
             helper = MySQLReplicationHelper(
                 server.host,
                 server.port,
                 server.username,
-                server.password
+                decrypt_data(server.password) # Decrypt password for helper
             )
             slave_status = helper.check_slave_status()
 
@@ -360,29 +399,42 @@ def list_databases(request, server_id):
                 'slave_status': slave_status
             })
             
+        except mysql.connector.Error as err:
+            error_message = f'Database error: {str(err)}'
+            if err.errno == 1115:  # Specific error code for utf8mb4 issues
+                error_message += (
+                    ". The server doesn't support utf8mb4 character set. "
+                    "To fix this, add the following to your MySQL server configuration:\n"
+                    "[mysqld]\n"
+                    "character-set-server = utf8mb4\n"
+                    "collation-server = utf8mb4_unicode_ci"
+                )
+            return JsonResponse({
+                'status': 'error',
+                'message': error_message,
+                'error_code': err.errno
+            }, status=500)
+        except Exception as e:
+            # Catch any other unexpected errors and return a generic JSON error
+            return JsonResponse({
+                'status': 'error',
+                'message': f'An unexpected error occurred during database operations: {str(e)}'
+            }, status=500)
         finally:
-            cursor.close()
-            connection.close()
-        
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
     except DatabaseServer.DoesNotExist:
         return JsonResponse({
             'status': 'error',
             'message': 'Server not found'
         }, status=404)
-    except mysql.connector.Error as err:
-        error_message = f'Database error: {str(err)}'
-        if err.errno == 1115:  # Specific error code for utf8mb4 issues
-            error_message += (
-                ". The server doesn't support utf8mb4 character set. "
-                "To fix this, add the following to your MySQL server configuration:\n"
-                "[mysqld]\n"
-                "character-set-server = utf8mb4\n"
-                "collation-server = utf8mb4_unicode_ci"
-            )
+    except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'message': error_message,
-            'error_code': err.errno
+            'message': f'An unexpected error occurred: {str(e)}'
         }, status=500)
 
 @csrf_exempt
@@ -631,9 +683,10 @@ def setup_replication_step(request, step):
                     server_id = data.get('server_id')
                     username = data.get('username')
                     password = data.get('password')
-                    logging.info(f"Received data for create_sql_user: server_id={server_id}, username={username}")
+                    host = data.get('host') # Retrieve host from data
+                    logging.info(f"Received data for create_sql_user: server_id={server_id}, username={username}, host={host}")
 
-                    if not all([server_id, username, password]):
+                    if not all([server_id, username, password, host]): # Add host to check
                         return JsonResponse({
                             'status': 'error',
                             'message': 'Missing required parameters'
@@ -646,14 +699,14 @@ def setup_replication_step(request, step):
                             server.host,
                             server.port,
                             server.username,
-                            server.password
+                            decrypt_data(server.password) # Decrypt password for helper
                         )
 
                         # Create replication user with appropriate privileges
                         helper.create_replication_user(
                             username,
                             password,
-                            '%',
+                            host, # Use the retrieved host
                             privileges="REPLICATION SLAVE, REPLICATION CLIENT"
                         )
 
@@ -662,7 +715,7 @@ def setup_replication_step(request, step):
                             server=server,
                             username=username,
                             host=host,
-                            defaults={'password': password, 'user_type': 'repl'}
+                            defaults={'password': encrypt_data(password), 'user_type': 'repl'} # Encrypt password
                         )
 
                         return JsonResponse({
@@ -675,7 +728,7 @@ def setup_replication_step(request, step):
                         return JsonResponse({
                             'status': 'error',
                             'message': str(e)
-                            })
+                        })
                 elif action == 'validate_prerequisites':
                     source_user = data.get('source_user')
                     target_user = data.get('target_user')
@@ -713,13 +766,13 @@ def setup_replication_step(request, step):
                             source.host,
                             source.port,
                             source.username,
-                            source.password
+                            decrypt_data(source.password) # Decrypt password for helper
                         )
                         target_helper = MySQLReplicationHelper(
                             target.host,
                             target.port,
                             target.username,
-                            target.password
+                            decrypt_data(target.password) # Decrypt password for helper
                         )
                     except DatabaseServer.DoesNotExist as e:
                         logger.error(f"Server not found: {str(e)}")
@@ -1203,11 +1256,14 @@ def setup_replication_step(request, step):
                             target.password
                         )
                         
+                        # Decrypt the replication user's password before passing it to setup_slave
+                        decrypted_repl_password = decrypt_data(source_db_user.password)
+
                         target_helper.setup_slave(
                             source.host,
                             source.port,
                             source_user,
-                            source_db_user.password,
+                            decrypted_repl_password, # Pass the decrypted password
                             master_log_file,
                             master_log_pos,
                             databases=[database]
@@ -1497,7 +1553,13 @@ def setup_replication_step(request, step):
                     if user not in excluded_users
                 ]
                 
+                # Check if user is created via the app (stored in DatabaseUser model)
                 for usr in source_users:
+                    usr['app_created'] = DatabaseUser.objects.filter(
+                        server=source,
+                        username=usr['user'],
+                        host=usr['host']
+                    ).exists()
                     try:
                         grants = source_helper.check_user_privileges(usr['user'], usr['host'])
                         usr['grants'] = grants
@@ -1525,7 +1587,13 @@ def setup_replication_step(request, step):
                     if user not in excluded_users
                 ]
                 
+                # Check if user is created via the app (stored in DatabaseUser model)
                 for usr in target_users:
+                    usr['app_created'] = DatabaseUser.objects.filter(
+                        server=target,
+                        username=usr['user'],
+                        host=usr['host']
+                    ).exists()
                     try:
                         grants = target_helper.check_user_privileges(usr['user'], usr['host'])
                         usr['grants'] = grants

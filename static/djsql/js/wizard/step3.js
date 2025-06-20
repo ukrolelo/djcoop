@@ -244,10 +244,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const data = await response.json();
             if (data.status === 'success') {
-                const commandOutputDiv = document.getElementById('command-output');
-                commandOutputDiv.innerHTML = `<pre>${data.raw_output}</pre>`;
                 output.className = 'alert alert-success mt-3';
-                output.innerHTML = 'Commands executed successfully. See raw output below.';
+                output.innerHTML = `Commands executed successfully.<br><pre>${data.raw_output}</pre>`;
                 output.classList.remove('d-none');
 
                 // If this was source command execution, enable transfer button
