@@ -17,3 +17,10 @@ __pycache__/
 # Ignore package files
 package.json
 package-lock.json
+
+# Ignore log files
+logs/
+*.log
+
+# Ignore virtual environment
+venv/
