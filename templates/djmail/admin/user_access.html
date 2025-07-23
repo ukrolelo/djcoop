@@ -1,0 +1,378 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h3>User Access Management</h3>
+        <p class="text-muted">Manage which users can access which email accounts</p>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'djmail:admin_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Users</h6>
+                        <h4 class="mb-0">{{ users.count }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Email Accounts</h6>
+                        <h4 class="mb-0">{{ accounts.count }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-server display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Active Grants</h6>
+                        <h4 class="mb-0">{{ total_grants }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-key display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grant New Access Form -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Grant New Access</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'djmail:admin_grant_access' %}">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="user_id" class="form-label">User</label>
+                            <select name="user_id" id="user_id" class="form-select" required>
+                                <option value="">Select User</option>
+                                {% for user in users %}
+                                    <option value="{{ user.id }}">
+                                        {{ user.email|default:user.username }}
+                                        {% if user.is_superuser %}(Admin){% elif user.is_staff %}(Staff){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="account_id" class="form-label">Email Account</label>
+                            <select name="account_id" id="account_id" class="form-select" required>
+                                <option value="">Select Account</option>
+                                {% for account in accounts %}
+                                    <option value="{{ account.id }}">
+                                        {{ account.name }} ({{ account.email }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="access_level" class="form-label">Access Level</label>
+                            <select name="access_level" id="access_level" class="form-select" required>
+                                <option value="read">Read Only</option>
+                                <option value="full">Full Access</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Grant Access
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'djmail:admin_accounts' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-server"></i> Manage Email Accounts
+                    </a>
+                    <a href="{% url 'djmail:admin_add_account' %}" class="btn btn-outline-success">
+                        <i class="bi bi-plus-circle"></i> Add New Email Account
+                    </a>
+                    <button class="btn btn-outline-info" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Access List
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Grants List -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">All Active Access Grants</h5>
+            </div>
+            <div class="card-body">
+                {% if total_grants > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Email Account</th>
+                                    <th>Access Level</th>
+                                    <th>Granted Date</th>
+                                    <th>Granted By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                    {% for access in user.email_account_accesses.all %}
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <strong>{{ user.email|default:user.username }}</strong>
+                                                {% if user.is_superuser %}
+                                                    <span class="badge bg-warning text-dark">Admin</span>
+                                                {% elif user.is_staff %}
+                                                    <span class="badge bg-info">Staff</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ access.email_account.name }}</strong>
+                                                {% if access.email_account.is_default %}
+                                                    <span class="badge bg-primary">Default</span>
+                                                {% endif %}
+                                                <br>
+                                                <small class="text-muted">{{ access.email_account.email }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if access.access_level == 'full' %}
+                                                <span class="badge bg-success">Full Access</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Read Only</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small>{{ access.granted_at|date:"M d, Y" }}<br>{{ access.granted_at|time:"H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            {% if access.granted_by %}
+                                                <small>{{ access.granted_by.email|default:access.granted_by.username }}</small>
+                                            {% else %}
+                                                <small class="text-muted">System</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'djmail:admin_user_account_access' user.id %}"
+                                                   class="btn btn-outline-primary btn-sm"
+                                                   title="Manage User Access">
+                                                    <i class="bi bi-gear"></i>
+                                                </a>
+                                                <a href="{% url 'djmail:admin_revoke_access' access.id %}"
+                                                   class="btn btn-outline-danger btn-sm"
+                                                   onclick="return confirm('Revoke {{ access.email_account.name }} access for {{ user.email|default:user.username }}?')"
+                                                   title="Revoke Access">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-key text-muted display-4"></i>
+                        <p class="text-muted mt-2">No active access grants</p>
+                        <p class="text-muted">Use the form above to grant users access to email accounts.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users and Their Access -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Users and Email Account Access</h5>
+            </div>
+            <div class="card-body">
+                {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Type</th>
+                                    <th>Email Accounts</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ user.email|default:user.username }}</strong>
+                                            {% if user.first_name or user.last_name %}
+                                                <br><small class="text-muted">{{ user.first_name }} {{ user.last_name }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if user.is_superuser %}
+                                            <span class="badge bg-warning text-dark">Admin</span>
+                                        {% elif user.is_staff %}
+                                            <span class="badge bg-info">Staff</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">User</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.email_account_accesses.all %}
+                                            {% for access in user.email_account_accesses.all %}
+                                                <div class="mb-1">
+                                                    <span class="badge bg-primary">{{ access.email_account.name }}</span>
+                                                    <small class="text-muted">({{ access.access_level }})</small>
+                                                    <a href="{% url 'djmail:admin_revoke_access' access.id %}" 
+                                                       class="btn btn-sm btn-outline-danger ms-1"
+                                                       onclick="return confirm('Revoke access to {{ access.email_account.name }}?')"
+                                                       title="Revoke Access">
+                                                        <i class="bi bi-x"></i>
+                                                    </a>
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">No access granted</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'djmail:admin_user_account_access' user.id %}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           title="Manage User Access">
+                                            <i class="bi bi-gear"></i> Manage
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-people text-muted display-4"></i>
+                        <p class="text-muted mt-2">No users found</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Accounts and Their Users -->
+<div class="row mt-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Email Accounts and Authorized Users</h5>
+            </div>
+            <div class="card-body">
+                {% if accounts %}
+                    <div class="row">
+                        {% for account in accounts %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">
+                                        {{ account.name }}
+                                        {% if account.is_default %}
+                                            <span class="badge bg-primary">Default</span>
+                                        {% endif %}
+                                    </h6>
+                                    <small class="text-muted">{{ account.email }}</small>
+                                </div>
+                                <div class="card-body">
+                                    {% if account.user_accesses.all %}
+                                        {% for access in account.user_accesses.all %}
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <div>
+                                                    <strong>{{ access.user.email|default:access.user.username }}</strong>
+                                                    <br><small class="text-muted">{{ access.access_level }} access</small>
+                                                </div>
+                                                <a href="{% url 'djmail:admin_revoke_access' access.id %}" 
+                                                   class="btn btn-sm btn-outline-danger"
+                                                   onclick="return confirm('Revoke access for {{ access.user.email|default:access.user.username }}?')"
+                                                   title="Revoke Access">
+                                                    <i class="bi bi-x"></i>
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted mb-0">No users have access</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-server text-muted display-4"></i>
+                        <p class="text-muted mt-2">No email accounts configured</p>
+                        <a href="{% url 'djmail:admin_add_account' %}" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> Add First Account
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

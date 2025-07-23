@@ -1,0 +1,204 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Create New Scan</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="create-scan-form">
+                        {% csrf_token %}
+                        
+                        <!-- Scan Details -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">Title *</label>
+                                {{ form.title }}
+                                {% if form.title.errors %}
+                                    <div class="text-danger small">{{ form.title.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Type *</label>
+                                <div class="btn-group w-100" role="group" aria-label="Scan type selection">
+                                    <input type="radio" class="btn-check" name="scan_type" id="scan-type-note" value="note" checked>
+                                    <label class="btn btn-outline-secondary" for="scan-type-note">
+                                        <i class="bi bi-sticky"></i> Note
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="scan_type" id="scan-type-document" value="document">
+                                    <label class="btn btn-outline-primary" for="scan-type-document">
+                                        <i class="bi bi-file-earmark-text"></i> Document
+                                    </label>
+                                </div>
+                                {% if form.scan_type.errors %}
+                                    <div class="text-danger small">{{ form.scan_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small">{{ form.description.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Document-specific fields -->
+                        <div id="document-fields" class="mb-4" style="display: none;">
+                            <div class="alert alert-success">
+                                <i class="bi bi-file-earmark-text"></i>
+                                <strong>Document ID:</strong> This document will be assigned a unique ID number.
+                                <br><small class="text-muted">Write this ID on your physical document for easy reference.</small>
+                            </div>
+
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Retention Settings:</strong> Choose how long to keep this document.
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.retention_days.id_for_label }}" class="form-label">
+                                        Retention Period (days)
+                                    </label>
+                                    {{ form.retention_days }}
+                                    <div class="form-text">Number of days to keep this document</div>
+                                    {% if form.retention_days.errors %}
+                                        <div class="text-danger small">{{ form.retention_days.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                                        OR Due Date
+                                    </label>
+                                    {{ form.due_date }}
+                                    <div class="form-text">Specific date when document should be deleted</div>
+                                    {% if form.due_date.errors %}
+                                        <div class="text-danger small">{{ form.due_date.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-lightbulb"></i>
+                                    <strong>Tip:</strong> You can specify either retention days OR a specific due date.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Image Upload -->
+                        <div class="mb-4">
+                            <label for="images" class="form-label">
+                                Upload Images *
+                            </label>
+                            <input type="file" name="images" id="images" class="form-control"
+                                   multiple accept="image/*" capture="camera" required>
+                            <div class="form-text">
+                                Select multiple images to create pages. On mobile devices, you can use the camera directly.
+                            </div>
+                        </div>
+
+                        <!-- Image Preview -->
+                        <div id="image-preview" class="mb-4" style="display: none;">
+                            <h6>Selected Images:</h6>
+                            <div class="row" id="preview-container"></div>
+                        </div>
+
+                        <!-- Form errors -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <!-- Actions -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'djnote:index' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Create Scan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const scanTypeRadios = document.querySelectorAll('input[name="scan_type"]');
+    const documentFields = document.getElementById('document-fields');
+    const retentionInput = document.getElementById('{{ form.retention_days.id_for_label }}');
+    const dueDateInput = document.getElementById('{{ form.due_date.id_for_label }}');
+    const imageInput = document.getElementById('images');
+    const imagePreview = document.getElementById('image-preview');
+    const previewContainer = document.getElementById('preview-container');
+
+    // Toggle document fields based on scan type
+    function toggleDocumentFields() {
+        const selectedType = document.querySelector('input[name="scan_type"]:checked').value;
+        if (selectedType === 'document') {
+            documentFields.style.display = 'block';
+        } else {
+            documentFields.style.display = 'none';
+            retentionInput.value = '';
+            dueDateInput.value = '';
+        }
+    }
+
+    // Initial toggle
+    toggleDocumentFields();
+
+    // Listen for changes on all radio buttons
+    scanTypeRadios.forEach(radio => {
+        radio.addEventListener('change', toggleDocumentFields);
+    });
+
+    // Image preview functionality
+    imageInput.addEventListener('change', function(e) {
+        previewContainer.innerHTML = '';
+        
+        if (e.target.files.length > 0) {
+            imagePreview.style.display = 'block';
+            
+            Array.from(e.target.files).forEach((file, index) => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-3 col-sm-4 col-6 mb-3';
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;" alt="Preview ${index + 1}">
+                                <div class="card-body p-2">
+                                    <small class="text-muted">Page ${index + 1}</small>
+                                </div>
+                            </div>
+                        `;
+                        previewContainer.appendChild(col);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        } else {
+            imagePreview.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

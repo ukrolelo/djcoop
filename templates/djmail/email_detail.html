@@ -33,7 +33,17 @@
                             {% if email.flagged %}Unflag{% else %}Flag{% endif %} Email
                         </a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">Move to Trash</a></li>
+                        {% if email.folder.folder_type == 'outbox' %}
+                        <li><a class="dropdown-item text-success" href="#" data-bs-toggle="modal" data-bs-target="#retryEmailModal">
+                            <i class="bi bi-arrow-clockwise"></i> Retry Send
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% endif %}
+                        <li><a class="dropdown-item text-warning" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">Move to Trash</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteEmailModal">
+                            <i class="bi bi-trash"></i> Delete Permanently
+                        </a></li>
                     </ul>
                 </div>
             </div>
@@ -243,6 +253,102 @@
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Create Task</button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Retry Email Confirmation Modal -->
+{% if email.folder.folder_type == 'outbox' %}
+<div class="modal fade" id="retryEmailModal" tabindex="-1" aria-labelledby="retryEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="retryEmailModalLabel">
+                    <i class="bi bi-arrow-clockwise"></i> Retry Email Send
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Retry Send:</strong> This will attempt to send the email again.
+                </div>
+
+                <p>Do you want to retry sending this email?</p>
+
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2">Email Details:</h6>
+                        <p class="mb-1"><strong>Subject:</strong> {{ email.subject|default:"(No Subject)" }}</p>
+                        <p class="mb-1"><strong>To:</strong> {{ email.recipients }}</p>
+                        {% if email.cc %}<p class="mb-1"><strong>CC:</strong> {{ email.cc }}</p>{% endif %}
+                        {% if email.bcc %}<p class="mb-1"><strong>BCC:</strong> {{ email.bcc }}</p>{% endif %}
+                        <p class="mb-0"><strong>Date:</strong> {{ email.date_received|date:"F j, Y, H:i" }}</p>
+                    </div>
+                </div>
+
+                <p class="mt-3 mb-0">
+                    <strong>If successful, the email will be moved from Outbox to Sent folder.</strong>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <form method="post" action="{% url 'djmail:retry_email' email.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-arrow-clockwise"></i> Retry Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Email Confirmation Modal -->
+<div class="modal fade" id="deleteEmailModal" tabindex="-1" aria-labelledby="deleteEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteEmailModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Confirm Email Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone!
+                </div>
+
+                <p>Are you sure you want to permanently delete this email?</p>
+
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2">Email Details:</h6>
+                        <p class="mb-1"><strong>Subject:</strong> {{ email.subject|default:"(No Subject)" }}</p>
+                        <p class="mb-1"><strong>From:</strong> {{ email.sender }}</p>
+                        <p class="mb-0"><strong>Date:</strong> {{ email.date_received|date:"F j, Y, H:i" }}</p>
+                    </div>
+                </div>
+
+                <p class="mt-3 mb-0">
+                    <strong>This email will be permanently removed from your mailbox and cannot be recovered.</strong>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <form method="post" action="{% url 'djmail:delete_email' email.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Permanently
+                    </button>
                 </form>
             </div>
         </div>

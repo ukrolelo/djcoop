@@ -1,35 +1,112 @@
-# Djcoop project that consist of several apps that help me in IT work
+# Djcoop - IT Management Suite
 
-![MariaDB SQL Replication Setup](static/img/djcoop_gh_1_tr.png)
+![Djcoop Project](static/img/djcoop_gh_1_tr.png)
 
-## MariaDB SQL Replication Setup
+A comprehensive Django project consisting of multiple applications designed to help with IT work and document management.
 
-The first part of this project focuses on setting up MariaDB SQL replication between servers.
+## Applications Overview
+
+### 1. DjSQL - MariaDB SQL Replication Management
+The original application focuses on setting up and managing MariaDB SQL replication between servers.
+
+### 2. DjMail - Email Management System (Under Development)
+Email account management and processing system for handling multiple email accounts.
+
+### 3. DjNote - Document & Note Scanner
+A mobile-friendly document scanning and management application with the following features:
+
+#### Core Features
+- **Document Scanning**: Take photos or upload images from gallery
+- **Multi-page Support**: One scan can contain multiple pages
+- **Document vs Note Classification**: Choose between document or note when saving
+- **Automatic Document ID**: Documents get unique sequential IDs (e.g., 000001, 000002)
+- **Retention Management**: Set how long documents should be stored
+- **Due Date Tracking**: Automatic calculation of deletion due dates
+- **Archive System**: Archive documents instead of permanent deletion
+- **Search & Filter**: Search by title, description, or document ID
+- **Mobile Optimized**: Responsive design for mobile document scanning
+
+#### Technical Features
+- **Thumbnail Generation**: Automatic thumbnail creation for fast loading
+- **Image Optimization**: Efficient storage and display of scanned images
+- **User Isolation**: Each user sees only their own scans
+
+### 4. Import/Export System
+The project includes a comprehensive backup and restore system:
+
+#### Features
+- **Database Backup**: Export all application data in JSON format
+- **Media File Backup**: Include uploaded files (scans, attachments) in backups
+- **Selective Export**: Choose which applications to include in backup
+- **Progress Tracking**: Real-time progress monitoring for large operations
+- **User Data Protection**: Includes user accounts and permissions in backups
+
+#### Supported Data
+- **DjSQL**: Database servers and user configurations
+- **DjMail**: Email accounts, folders, messages, and attachments
+- **DjNote**: Scanned documents, pages, and associated media files
+- **User Management**: User accounts, groups, and permissions
+
+## Installation and Setup
+
+### Prerequisites
+- Python 3.8+
+- Django 4.2+
+- Pillow (for image processing in DjNote)
+- Other dependencies listed in `requirements.txt`
+
+### Installation Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd djcoop
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Apply database migrations:**
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+
+4. **Create superuser (optional):**
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+5. **Run the development server:**
+   ```bash
+   python manage.py runserver
+   ```
+
+### Application URLs
+- **Main Dashboard**: `/` - Central hub with links to all applications
+- **DjSQL**: `/djsql/` - MariaDB replication management
+- **DjMail**: `/mail/` - Email management system
+- **DjNote**: `/notes/` - Document and note scanner
+- **Admin Panel**: `/admin/` - Django administration interface
 
 
+## MariaDB SQL Replication Setup (DjSQL)
 
-#### Django Application Setup
+The DjSQL application provides a web interface for managing MariaDB replication between servers. This was the original component of the djcoop project.
 
-Run the Django application. Navigate to the root `djcoop` directory and execute the following commands:
+### Key Features
+- Server configuration management
+- Replication status monitoring
+- User and database management
+- Connection testing and validation
 
-1.  **Run Django Development Server:**
-    ```bash
-    python manage.py runserver
-    ```
-2.  **Apply Database Migrations:**
-    ```bash
-    python manage.py makemigrations
-    python manage.py migrate
-    ```
-    These commands will prepare your Django application's database schema.
+**The original MariaDB replication component was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).**
 
+## Screenshots
 
-
-**This first part of the project was built with the assistance of [`refact.ai "KUDOS Refact Team"`](https://refact.ai/).**
-
-
-### Screenshots
-
+### DjSQL - MariaDB Replication Management
 ![Screenshot 1](static/img/screenshots/screen1.png)
 ![Screenshot 2](static/img/screenshots/screen2.png)
 ![Screenshot 3](static/img/screenshots/screen3.png)
@@ -126,3 +203,33 @@ collation-server = utf8mb4_general_ci
 *   **`server-id = 1` (for `dbserver1`)**: Each server in a replication topology must have a unique `server-id`. `dbserver1` uses `1`, and `dbserver2` (not shown here, but configured similarly in its `my-custom.cnf`) uses `10` to ensure distinct identification within the replication setup.
 *   **`binlog_format = ROW`**: Specifies the format for binary logging, `ROW` is generally recommended for safety and consistency in replication.
 *   **`character-set-server = utf8mb4`** and **`collation-server = utf8mb4_general_ci`**: Set the default character set and collation for the server.
+
+## Features Summary
+
+### Current Capabilities
+- ✅ **MariaDB Replication Management** - Complete setup and monitoring
+- ✅ **Email Account Management** - Multi-account email processing
+- ✅ **Document Scanning** - Mobile-friendly document capture and management
+- ✅ **Data Import/Export** - Full project backup and restore capabilities
+- ✅ **User Management** - Multi-user support with data isolation
+- ✅ **Responsive Design** - Works on desktop and mobile devices
+
+### Technical Highlights
+- **Django 4.2+** framework with modern best practices
+- **Bootstrap CSS** for consistent, responsive UI
+- **Image Processing** with Pillow for document thumbnails
+- **Database Agnostic** - Works with SQLite, PostgreSQL, MySQL/MariaDB
+- **Modular Architecture** - Each app can be used independently
+- **Comprehensive Logging** - Detailed logs for troubleshooting
+
+
+
+## License
+
+This project is developed for personal use. Please respect any third-party licenses for included dependencies.
+
+---
+
+**Development Tools Used:**
+- Original MariaDB component: [`refact.ai`](https://refact.ai/)
+- Additional development: Various AI coding assistants and manual development

@@ -2,338 +2,515 @@
 {% load static %}
 
 {% block extra_js %}
+<style>
+/* Roundcube-like mail interface styles */
+.mail-container {
+    height: calc(100vh - 150px);
+    display: flex;
+    flex-direction: column;
+    margin: -20px;
+    padding: 0;
+}
+
+.mail-toolbar {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mail-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.mail-folders {
+    width: 200px;
+    border-right: 1px solid #dee2e6;
+    background: #f8f9fa;
+    overflow-y: auto;
+}
+
+.mail-list {
+    width: 350px;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.mail-preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: white;
+}
+
+.folder-item {
+    padding: 8px 15px;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+}
+
+.folder-item:hover {
+    background: #e9ecef;
+    text-decoration: none;
+    color: inherit;
+}
+
+.folder-item.active {
+    background: #007bff;
+    color: white;
+}
+
+.email-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.email-item:hover {
+    background: #f8f9fa;
+}
+
+.email-item.selected {
+    background: #e3f2fd;
+    border-left: 3px solid #007bff;
+}
+
+.email-item.unread {
+    font-weight: bold;
+    background: #fff3cd;
+}
+
+.email-preview-header {
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.email-preview-content {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.email-content-preview {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.email-text-preview {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.email-preview-header h5 {
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.email-list-header {
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: bold;
+}
+
+.no-email-selected {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+    font-size: 1.1em;
+}
+
+.email-meta {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.email-subject {
+    font-weight: 500;
+    margin: 2px 0;
+}
+
+.email-sender {
+    font-size: 0.9em;
+    color: #495057;
+}
+</style>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle email flag
-        document.querySelectorAll('.toggle-flag').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const emailId = this.getAttribute('data-email-id');
-                const icon = this.querySelector('i');
-                
-                fetch(`/mail/toggle-flag/${emailId}/`, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.flagged) {
-                            icon.classList.remove('bi-star');
-                            icon.classList.add('bi-star-fill', 'text-warning');
-                        } else {
-                            icon.classList.remove('bi-star-fill', 'text-warning');
-                            icon.classList.add('bi-star');
-                        }
-                    }
-                });
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    let selectedEmailId = null;
+    
+    // Email selection functionality
+    document.querySelectorAll('.email-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+            // Remove previous selection
+            document.querySelectorAll('.email-item').forEach(el => el.classList.remove('selected'));
+            
+            // Add selection to clicked item
+            this.classList.add('selected');
+            
+            // Get email ID and load preview
+            selectedEmailId = this.dataset.emailId;
+            loadEmailPreview(selectedEmailId);
+            
+            // Mark as read if unread
+            if (this.classList.contains('unread')) {
+                markEmailRead(selectedEmailId);
+                this.classList.remove('unread');
+            }
         });
+    });
+    
+    // Load email preview via AJAX
+    function loadEmailPreview(emailId) {
+        const previewContainer = document.getElementById('emailPreview');
+        previewContainer.innerHTML = '<div class="d-flex justify-content-center p-4"><div class="spinner-border" role="status"></div></div>';
         
-        // Mark as read/unread
-        document.querySelectorAll('.mark-read, .mark-unread').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const emailId = this.getAttribute('data-email-id');
-                const row = document.querySelector(`tr[data-email-id="${emailId}"]`);
-                const isMarkRead = this.classList.contains('mark-read');
-                const url = isMarkRead ? 
-                    `/mail/mark-read/${emailId}/` : 
-                    `/mail/mark-unread/${emailId}/`;
-                
-                fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (isMarkRead) {
-                            row.classList.remove('fw-bold');
-                        } else {
-                            row.classList.add('fw-bold');
+        // Show loading state first
+        previewContainer.innerHTML = `
+            <div class="email-preview-header">
+                <h5>Loading email...</h5>
+                <p class="mb-0">Please wait while we load the email content.</p>
+            </div>
+        `;
+
+        fetch(`/mail/email/${emailId}/`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            // Parse the HTML response to extract email content
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Extract email details
+            const subject = doc.querySelector('h1')?.textContent || 'No Subject';
+            const sender = doc.querySelector('.email-details')?.textContent || 'Unknown Sender';
+            const emailContent = doc.querySelector('.email-html-content') || doc.querySelector('.email-text-content');
+
+            let contentHtml = '';
+            if (emailContent) {
+                // If it's HTML content with iframe, extract the content
+                if (emailContent.querySelector('iframe')) {
+                    const script = emailContent.querySelector('script');
+                    if (script) {
+                        // Extract HTML content from the script
+                        const scriptText = script.textContent;
+                        const htmlMatch = scriptText.match(/const htmlContent = `([^`]+)`/);
+                        if (htmlMatch) {
+                            // Decode the escaped HTML
+                            const decodedHtml = htmlMatch[1]
+                                .replace(/\\u003C/g, '<')
+                                .replace(/\\u003E/g, '>')
+                                .replace(/\\u0022/g, '"')
+                                .replace(/\\u0027/g, "'")
+                                .replace(/\\u002D/g, '-')
+                                .replace(/\\u002F/g, '/');
+                            contentHtml = `<div class="email-content-preview">${decodedHtml}</div>`;
                         }
                     }
-                });
+                } else {
+                    // Plain text content
+                    contentHtml = `<pre class="email-text-preview">${emailContent.textContent}</pre>`;
+                }
+            }
+
+            if (!contentHtml) {
+                contentHtml = '<p class="text-muted">No content available</p>';
+            }
+
+            previewContainer.innerHTML = `
+                <div class="email-preview-header">
+                    <h5>${subject}</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">${sender}</small>
+                        <a href="/mail/email/${emailId}/" class="btn btn-sm btn-outline-primary" target="_blank">
+                            <i class="bi bi-box-arrow-up-right"></i> Open Full View
+                        </a>
+                    </div>
+                </div>
+                <div class="email-preview-content mt-3">
+                    ${contentHtml}
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error loading email:', error);
+            previewContainer.innerHTML = '<div class="alert alert-danger m-3">Error loading email</div>';
+        });
+    }
+    
+    // Mark email as read
+    function markEmailRead(emailId) {
+        fetch(`/mail/mark-read/${emailId}/`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+        });
+    }
+    
+    // Toggle flag functionality
+    document.querySelectorAll('.toggle-flag').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            const emailId = this.dataset.emailId;
+            const icon = this.querySelector('i');
+            
+            fetch(`/mail/toggle-flag/${emailId}/`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.flagged) {
+                        icon.classList.remove('bi-star');
+                        icon.classList.add('bi-star-fill', 'text-warning');
+                    } else {
+                        icon.classList.remove('bi-star-fill', 'text-warning');
+                        icon.classList.add('bi-star');
+                    }
+                }
             });
         });
     });
+});
 </script>
 {% endblock %}
 
 {% block content %}
-<div class="row mb-3">
-    <div class="col">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>{{ account.name }}</h3>
-            <div>
-                <a href="{% url 'djmail:compose' %}" class="btn btn-primary">
+<div class="mail-container">
+    <!-- Mail Toolbar -->
+    <div class="mail-toolbar">
+        <div class="d-flex align-items-center gap-2">
+            <!-- Sidebar Toggle Button -->
+            <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+                <i class="bi bi-list"></i>
+            </button>
+            <h5 class="mb-0">{{ account.name|default:"Mail" }}</h5>
+            {% if account %}
+                <span class="badge bg-secondary">{{ current_folder|title }}</span>
+            {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+            {% if account %}
+                <a href="{% url 'djmail:compose' %}" class="btn btn-primary btn-sm">
                     <i class="bi bi-envelope-plus"></i> Compose
                 </a>
-                <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-secondary">
-                    <i class="bi bi-arrow-repeat"></i> Check Mail
+                <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-repeat"></i> Refresh
                 </a>
-                <div class="dropdown d-inline-block">
-                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="accountsDropdown" 
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountsDropdown">
-                        <li><a class="dropdown-item" href="{% url 'djmail:accounts' %}">Manage Accounts</a></li>
-                        <li><a class="dropdown-item" href="{% url 'djmail:tasks' %}">Task Manager</a></li>
-                    </ul>
+            {% endif %}
+            <a href="{% url 'djmail:mail_settings' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-gear"></i> Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- Under Construction Notice -->
+    <div class="alert alert-warning alert-dismissible fade show mx-3 mb-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <strong>Under Construction</strong> - This mail interface is currently being developed and may have limited functionality.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <!-- Mail Content -->
+    <div class="mail-content">
+        <!-- Folders Sidebar -->
+        <div class="mail-folders">
+            {% if folders %}
+                {% for folder in folders %}
+                <a href="{% url 'djmail:index' %}?folder={{ folder.folder_type }}" 
+                   class="folder-item {% if folder.folder_type == current_folder %}active{% endif %}">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if folder.folder_type == 'inbox' %}
+                            <i class="bi bi-inbox"></i>
+                        {% elif folder.folder_type == 'sent' %}
+                            <i class="bi bi-send"></i>
+                        {% elif folder.folder_type == 'outbox' %}
+                            <i class="bi bi-hourglass-split"></i>
+                        {% elif folder.folder_type == 'drafts' %}
+                            <i class="bi bi-file-earmark-text"></i>
+                        {% elif folder.folder_type == 'trash' %}
+                            <i class="bi bi-trash"></i>
+                        {% else %}
+                            <i class="bi bi-folder"></i>
+                        {% endif %}
+                        <span>{{ folder.name }}</span>
+                    </div>
+                    <span class="badge bg-light text-dark">{{ folder.email_set.count|default:0 }}</span>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="p-3 text-center text-muted">
+                    <i class="bi bi-folder-x"></i>
+                    <p class="mb-0 mt-2">No folders</p>
                 </div>
+            {% endif %}
+        </div>
+
+        <!-- Email List -->
+        <div class="mail-list">
+            <div class="email-list-header">
+                {{ folder.name|default:"Emails" }} ({{ emails.paginator.count|default:0 }})
+            </div>
+            <div class="flex-fill overflow-auto">
+                {% if emails %}
+                    {% for email in emails %}
+                    <div class="email-item {% if not email.read %}unread{% endif %}" data-email-id="{{ email.id }}">
+                        <div class="flex-shrink-0">
+                            <button class="btn btn-sm btn-link toggle-flag p-0" data-email-id="{{ email.id }}">
+                                <i class="bi {% if email.flagged %}bi-star-fill text-warning{% else %}bi-star{% endif %}"></i>
+                            </button>
+                        </div>
+                        <div class="flex-fill">
+                            <div class="email-sender">{{ email.sender_name|default:email.sender }}</div>
+                            <div class="email-subject">{{ email.subject|truncatechars:40 }}</div>
+                            <div class="email-meta">{{ email.date_received|date:"M d, H:i" }}</div>
+                        </div>
+                        {% if email.attachments.exists %}
+                            <div class="flex-shrink-0">
+                                <i class="bi bi-paperclip text-muted"></i>
+                            </div>
+                        {% endif %}
+                        <div class="flex-shrink-0">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false"
+                                        onclick="event.stopPropagation();">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{% url 'djmail:email_detail' email.id %}">
+                                        <i class="bi bi-eye"></i> View
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'djmail:reply' email.id %}">
+                                        <i class="bi bi-reply"></i> Reply
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'djmail:forward' email.id %}">
+                                        <i class="bi bi-forward"></i> Forward
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">
+                                        <i class="bi bi-archive"></i> Move to Trash
+                                    </a></li>
+                                    <li><a class="dropdown-item text-danger" href="#"
+                                           data-bs-toggle="modal"
+                                           data-bs-target="#deleteEmailModal{{ email.id }}"
+                                           onclick="event.stopPropagation();">
+                                        <i class="bi bi-trash"></i> Delete Permanently
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Delete Email Confirmation Modals -->
+                    {% for email in emails %}
+                    <div class="modal fade" id="deleteEmailModal{{ email.id }}" tabindex="-1" aria-labelledby="deleteEmailModalLabel{{ email.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title" id="deleteEmailModalLabel{{ email.id }}">
+                                        <i class="bi bi-exclamation-triangle"></i> Confirm Email Deletion
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        <strong>Warning:</strong> This action cannot be undone!
+                                    </div>
+
+                                    <p>Are you sure you want to permanently delete this email?</p>
+
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title mb-2">Email Details:</h6>
+                                            <p class="mb-1"><strong>Subject:</strong> {{ email.subject|default:"(No Subject)" }}</p>
+                                            <p class="mb-1"><strong>From:</strong> {{ email.sender }}</p>
+                                            <p class="mb-0"><strong>Date:</strong> {{ email.date_received|date:"F j, Y, H:i" }}</p>
+                                        </div>
+                                    </div>
+
+                                    <p class="mt-3 mb-0">
+                                        <strong>This email will be permanently removed from your mailbox and cannot be recovered.</strong>
+                                    </p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="bi bi-x-circle"></i> Cancel
+                                    </button>
+                                    <form method="post" action="{% url 'djmail:delete_email' email.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="bi bi-trash"></i> Delete Permanently
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-envelope display-4"></i>
+                        <p class="mt-2">No emails in this folder</p>
+                        {% if current_folder == 'inbox' and account %}
+                            <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-arrow-repeat"></i> Check for Mail
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Email Preview -->
+        <div class="mail-preview" id="emailPreview">
+            <div class="no-email-selected">
+                <i class="bi bi-envelope display-1 mb-3"></i>
+                <p>Select an email to view its content</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <!-- Folders Sidebar -->
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-header">
-                Folders
-            </div>
-            <div class="list-group list-group-flush">
-                {% for folder in folders %}
-                <a href="{% url 'djmail:index' %}?folder={{ folder.folder_type }}" 
-                   class="list-group-item list-group-item-action {% if folder.folder_type == current_folder %}active{% endif %}">
-                    {% if folder.folder_type == 'inbox' %}
-                        <i class="bi bi-inbox"></i>
-                    {% elif folder.folder_type == 'sent' %}
-                        <i class="bi bi-send"></i>
-                    {% elif folder.folder_type == 'drafts' %}
-                        <i class="bi bi-file-earmark-text"></i>
-                    {% elif folder.folder_type == 'trash' %}
-                        <i class="bi bi-trash"></i>
-                    {% else %}
-                        <i class="bi bi-folder"></i>
-                    {% endif %}
-                    {{ folder.name }}
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <!-- Search Panel -->
-        <div class="card mt-3">
-            <div class="card-header">
-                Search
-            </div>
-            <div class="card-body">
-                <form method="get" action="{% url 'djmail:index' %}">
-                    <input type="hidden" name="folder" value="{{ current_folder }}">
-                    
-                    <div class="mb-3">
-                        {{ search_form.query }}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Date Range</label>
-                        <div class="row g-2">
-                            <div class="col">
-                                {{ search_form.from_date }}
-                                <small class="form-text text-muted">From</small>
-                            </div>
-                            <div class="col">
-                                {{ search_form.to_date }}
-                                <small class="form-text text-muted">To</small>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        {{ search_form.has_attachment }}
-                        <label class="form-check-label" for="{{ search_form.has_attachment.id_for_label }}">
-                            Has attachment
-                        </label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-outline-primary w-100">
-                        <i class="bi bi-search"></i> Search
-                    </button>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Recent Tasks -->
-        <div class="card mt-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Recent Tasks</span>
-                <a href="{% url 'djmail:tasks' %}" class="btn btn-sm btn-outline-primary">All Tasks</a>
-            </div>
-            <div class="list-group list-group-flush">
-                {% if recent_tasks %}
-                    {% for task in recent_tasks %}
-                    <div class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <a href="{% url 'djmail:task_detail' task.id %}">{{ task.title }}</a>
-                            <span class="badge {% if task.priority == 'high' or task.priority == 'urgent' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
-                                {{ task.get_priority_display }}
-                            </span>
-                        </div>
-                        <small class="text-muted">Status: {{ task.get_status_display }}</small>
-                        {% if task.related_email %}
-                        <div>
-                            <small><a href="{% url 'djmail:email_detail' task.related_email.id %}">View Related Email</a></small>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="list-group-item">No active tasks</div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Email List -->
-    <div class="col-md-9">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">{{ folder.name }}</h5>
-                    <div>
-                        <span class="badge bg-primary">{{ page_obj.paginator.count }} emails</span>
-                    </div>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th style="width: 30px;"></th>  <!-- Flag -->
-                            <th style="width: 35%;">From</th>
-                            <th style="width: 45%;">Subject</th>
-                            <th style="width: 20%;">Date</th>
-                            <th style="width: 80px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if emails %}
-                            {% for email in emails %}
-                            <tr data-email-id="{{ email.id }}" class="{% if not email.read %}fw-bold{% endif %}">
-                                <td>
-                                    <button class="btn btn-sm btn-link toggle-flag p-0 border-0" data-email-id="{{ email.id }}">
-                                        <i class="bi {% if email.flagged %}bi-star-fill text-warning{% else %}bi-star{% endif %}"></i>
-                                    </button>
-                                </td>
-                                <td>
-                                    <a href="{% url 'djmail:email_detail' email.id %}">
-                                        {% if email.sender_name %}
-                                            {{ email.sender_name }}
-                                        {% else %}
-                                            {{ email.sender }}
-                                        {% endif %}
-                                    </a>
-                                    {% if email.attachments.exists %}
-                                        <i class="bi bi-paperclip text-muted"></i>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="{% url 'djmail:email_detail' email.id %}">
-                                        {{ email.subject|default:"(No Subject)" }}
-                                    </a>
-                                </td>
-                                <td>{{ email.date_received|date:"M d, Y H:i" }}</td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
-                                                data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><a class="dropdown-item" href="{% url 'djmail:email_detail' email.id %}">View</a></li>
-                                            <li><a class="dropdown-item" href="{% url 'djmail:reply' email.id %}">Reply</a></li>
-                                            <li><a class="dropdown-item" href="{% url 'djmail:forward' email.id %}">Forward</a></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            {% if email.read %}
-                                                <li><button class="dropdown-item mark-unread" data-email-id="{{ email.id }}">Mark as Unread</button></li>
-                                            {% else %}
-                                                <li><button class="dropdown-item mark-read" data-email-id="{{ email.id }}">Mark as Read</button></li>
-                                            {% endif %}
-                                            <li><a class="dropdown-item" href="{% url 'djmail:create_task_for_email' email.id %}">Create Task</a></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item text-danger" href="{% url 'djmail:move_to_folder' email.id 'trash' %}">Move to Trash</a></li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center py-4">
-                                    <p>No emails in this folder</p>
-                                    {% if current_folder == 'inbox' %}
-                                        <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-outline-primary btn-sm">
-                                            <i class="bi bi-arrow-repeat"></i> Check for New Mail
-                                        </a>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Pagination -->
-            {% if emails.has_other_pages %}
-            <div class="card-footer">
-                <nav aria-label="Page navigation">
-                    <ul class="pagination justify-content-center mb-0">
-                        {% if emails.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">First</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ emails.previous_page_number }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Previous</a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">First</span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link">Previous</span>
-                            </li>
-                        {% endif %}
-                        
-                        {% for num in emails.paginator.page_range %}
-                            {% if emails.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                            {% elif num > emails.number|add:'-3' and num < emails.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">{{ num }}</a>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if emails.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ emails.next_page_number }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Next</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ emails.paginator.num_pages }}{% if search_form.query.value %}&query={{ search_form.query.value }}{% endif %}&folder={{ current_folder }}">Last</a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">Next</span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link">Last</span>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
+{% csrf_token %}
 {% endblock %}

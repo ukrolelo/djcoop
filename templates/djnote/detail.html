@@ -1,0 +1,372 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% csrf_token %}
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-3 mb-2">
+                <span class="badge bg-{% if scan.scan_type == 'document' %}primary{% else %}secondary{% endif %} fs-6">
+                    {{ scan.get_scan_type_display }}
+                </span>
+                {% if scan.document_id %}
+                    <div class="alert alert-success d-inline-block p-3 ms-2">
+                        <i class="bi bi-file-earmark-text" style="font-size: 1.5rem;"></i>
+                        <strong style="font-size: 1.3rem;">Document ID: <span class="document-id" style="font-size: 1.8rem; text-decoration: underline;">{{ scan.document_id|add:0 }}</span></strong>
+                        <small class="d-block text-muted mt-1">Write this on your physical document</small>
+                    </div>
+                {% endif %}
+                <span class="text-muted">{{ scan.page_count }} page{{ scan.page_count|pluralize }}</span>
+            </div>
+            {% if scan.description %}
+                <p class="text-muted">{{ scan.description }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="btn-group" role="group">
+            <a href="{% url 'djnote:add_pages' scan.id %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Add Pages
+            </a>
+            <a href="{% url 'djnote:edit' scan.id %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-three-dots"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <form method="post" action="{% url 'djnote:archive' scan.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-archive"></i> 
+                                {% if scan.is_archived %}Unarchive{% else %}Archive{% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document info -->
+    {% if scan.scan_type == 'document' %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="alert {% if scan.is_overdue %}alert-danger{% elif scan.is_due_soon %}alert-warning{% else %}alert-info{% endif %}">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <strong>Created:</strong> {{ scan.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                    {% if scan.due_date %}
+                    <div class="col-md-4">
+                        <strong>Due Date:</strong> {{ scan.due_date|date:"d.m.Y" }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Status:</strong>
+                        {% if scan.is_overdue %}
+                            <span class="text-danger">Overdue</span>
+                        {% elif scan.is_due_soon %}
+                            <span class="text-warning">Due Soon</span>
+                        {% else %}
+                            <span class="text-success">Active</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pages -->
+    {% if pages %}
+    <div class="mb-3">
+        <div class="alert alert-info">
+            <i class="bi bi-arrows-move"></i>
+            <strong>Drag & Drop:</strong> Drag pages to reorder them. The first page will be used as the main thumbnail.
+        </div>
+    </div>
+
+    <div class="row" id="pages-container">
+        {% for page in pages %}
+        <div class="col-lg-3 col-md-4 col-sm-6 mb-4 page-item" data-page-id="{{ page.id }}" data-page-number="{{ page.page_number }}">
+            <div class="card page-card">
+                <div class="position-relative">
+                    <!-- Drag handle -->
+                    <div class="drag-handle position-absolute top-0 start-50 translate-middle-x mt-1"
+                         style="z-index: 10; cursor: grab;">
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-grip-horizontal"></i>
+                        </span>
+                    </div>
+
+                    {% if page.thumbnail %}
+                        <img src="{{ page.thumbnail.url }}" class="card-img-top"
+                             style="height: 250px; object-fit: cover;" alt="Page {{ page.page_number }}">
+                    {% else %}
+                        <img src="{{ page.image.url }}" class="card-img-top"
+                             style="height: 250px; object-fit: cover;" alt="Page {{ page.page_number }}">
+                    {% endif %}
+
+                    <!-- Page number badge -->
+                    <span class="position-absolute top-0 start-0 badge bg-primary m-2 page-number-badge">
+                        {{ page.page_number }}
+                        {% if page.page_number == 1 %}
+                            <i class="bi bi-star-fill ms-1" title="Main thumbnail"></i>
+                        {% endif %}
+                    </span>
+
+                    <!-- Delete button -->
+                    <button type="button" class="position-absolute top-0 end-0 btn btn-sm btn-danger m-2"
+                            data-bs-toggle="modal" data-bs-target="#deletePageModal{{ page.id }}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+
+                <div class="card-body p-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">Page {{ page.page_number }}</small>
+                        <small class="text-muted">{{ page.created_at|date:"d.m.Y" }}</small>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ page.image.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-eye"></i> View Full Size
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Delete Page Modal -->
+            <div class="modal fade" id="deletePageModal{{ page.id }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Delete Page</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete page {{ page.page_number }}?</p>
+                            <p class="text-muted small">This action cannot be undone.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form method="post" action="{% url 'djnote:delete_page' page.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">Delete Page</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-images text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3">No pages yet</h4>
+        <p class="text-muted">Add some pages to this scan.</p>
+        <a href="{% url 'djnote:add_pages' scan.id %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Pages
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Back button -->
+    <div class="mt-4">
+        <a href="{% url 'djnote:index' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Scans
+        </a>
+    </div>
+</div>
+
+<!-- Delete Scan Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Scan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<strong>{{ scan.title }}</strong>"?</p>
+                <p class="text-muted small">This will delete all {{ scan.page_count }} page{{ scan.page_count|pluralize }} and cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'djnote:delete' scan.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Scan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const pagesContainer = document.getElementById('pages-container');
+    let draggedElement = null;
+    let draggedPageId = null;
+
+    // Make page items draggable
+    const pageItems = document.querySelectorAll('.page-item');
+    pageItems.forEach(item => {
+        item.draggable = true;
+
+        // Drag start
+        item.addEventListener('dragstart', function(e) {
+            draggedElement = this;
+            draggedPageId = this.dataset.pageId;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        });
+
+        // Drag end
+        item.addEventListener('dragend', function(e) {
+            this.style.opacity = '1';
+            draggedElement = null;
+            draggedPageId = null;
+        });
+
+        // Drag over
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+        });
+
+        // Drag leave
+        item.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+
+        // Drop
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            if (draggedElement !== this) {
+                // Get all page items
+                const allPages = Array.from(pagesContainer.querySelectorAll('.page-item'));
+                const draggedIndex = allPages.indexOf(draggedElement);
+                const targetIndex = allPages.indexOf(this);
+
+                // Reorder in DOM
+                if (draggedIndex < targetIndex) {
+                    this.parentNode.insertBefore(draggedElement, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(draggedElement, this);
+                }
+
+                // Update page numbers and send to server
+                updatePageOrder();
+            }
+        });
+    });
+
+    function updatePageOrder() {
+        const pageItems = pagesContainer.querySelectorAll('.page-item');
+        const newOrder = [];
+
+        // Update visual page numbers
+        pageItems.forEach((item, index) => {
+            const pageId = item.dataset.pageId;
+            const newPageNumber = index + 1;
+
+            // Update badge
+            const badge = item.querySelector('.page-number-badge');
+            badge.innerHTML = newPageNumber;
+            if (newPageNumber === 1) {
+                badge.innerHTML += ' <i class="bi bi-star-fill ms-1" title="Main thumbnail"></i>';
+            }
+
+            // Update text
+            const pageText = item.querySelector('.text-muted');
+            pageText.textContent = `Page ${newPageNumber}`;
+
+            // Store new order
+            newOrder.push({
+                page_id: pageId,
+                page_number: newPageNumber
+            });
+        });
+
+        // Show loading state
+        const container = document.getElementById('pages-container');
+        container.style.opacity = '0.7';
+        container.style.pointerEvents = 'none';
+
+        // Send new order to server
+        fetch(`/notes/scan/{{ scan.id }}/reorder-pages/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                pages: newOrder
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Restore container state
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto';
+
+            if (data.success) {
+                // Show success message
+                showMessage('Pages reordered successfully!', 'success');
+            } else {
+                showMessage('Error reordering pages. Please refresh and try again.', 'error');
+            }
+        })
+        .catch(error => {
+            // Restore container state
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto';
+
+            console.error('Error:', error);
+            showMessage('Error reordering pages. Please refresh and try again.', 'error');
+        });
+    }
+
+    function showMessage(message, type) {
+        // Create and show a temporary message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // Insert at top of content
+        const mainContent = document.querySelector('.container-fluid');
+        mainContent.insertBefore(alertDiv, mainContent.firstChild);
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
+});
+</script>
+{% endblock %}

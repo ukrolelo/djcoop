@@ -3,13 +3,13 @@ from .models import EmailAccount, Task, Email
 
 class EmailAccountForm(forms.ModelForm):
     """Form for creating and editing email accounts"""
-    password = forms.CharField(widget=forms.PasswordInput())
-    
+    password = forms.CharField(widget=forms.PasswordInput(), required=False)
+
     class Meta:
         model = EmailAccount
         fields = [
             'name', 'email', 'pop3_server', 'pop3_port',
-            'smtp_server', 'smtp_port', 'username', 'password', 
+            'smtp_server', 'smtp_port', 'username', 'password',
             'use_ssl', 'is_default'
         ]
         
@@ -21,8 +21,17 @@ class EmailAccountForm(forms.ModelForm):
             'smtp_server': forms.TextInput(attrs={'class': 'form-control'}),
             'smtp_port': forms.NumberInput(attrs={'class': 'form-control'}),
             'username': forms.TextInput(attrs={'class': 'form-control'}),
-            'password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'password': forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank to keep current password'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # For editing existing accounts, make password not required
+        if self.instance and self.instance.pk:
+            self.fields['password'].required = False
+            self.fields['password'].help_text = "Leave blank to keep current password"
+        else:
+            self.fields['password'].required = True
 
 class ComposeEmailForm(forms.Form):
     """Form for composing a new email"""

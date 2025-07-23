@@ -8,11 +8,17 @@
     <link rel="icon" href="{% static 'favicon.ico' %}">
     <link href="{% static 'assets/vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
     <link href="{% static 'assets/vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
     <style>
         .sidebar {
             min-height: 100vh;
             background: #f8f9fa;
             padding-top: 20px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 16.666667%; /* col-md-2 equivalent */
+            z-index: 1040;
         }
         .sidebar .nav-link {
             color: #333;
@@ -24,6 +30,8 @@
         }
         .main-content {
             padding: 20px;
+            margin-left: 16.666667%; /* Account for fixed sidebar */
+            transition: margin-left 0.3s ease;
         }
         .replication-arrow {
             font-size: 24px;
@@ -87,30 +95,187 @@
         .btn-primary {
             padding: 0.5rem 2rem;
         }
+        /* Collapsible sidebar styles */
+        .sidebar .nav-link.dropdown-toggle {
+            position: relative;
+        }
+        .sidebar .nav-link.dropdown-toggle::after {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.3s ease;
+        }
+        .sidebar .nav-link.dropdown-toggle[aria-expanded="true"]::after {
+            transform: translateY(-50%) rotate(180deg);
+        }
+        .sidebar .nav-submenu {
+            padding-left: 20px;
+            background-color: transparent;
+        }
+        .sidebar .nav-submenu .nav-link {
+            padding: 8px 20px;
+            font-size: 0.9em;
+            background-color: transparent;
+        }
+        .sidebar .collapse {
+            background-color: transparent;
+        }
+        /* Sidebar toggle functionality */
+        .sidebar-toggle {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 15px;
+        }
+        .sidebar-toggle:hover {
+            background: #0056b3;
+        }
+        /* Adjust main content to account for burger button */
+        .main-content {
+            position: relative;
+        }
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        .main-content.expanded {
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+        }
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        /* Responsive adjustments for mail interface */
+        @media (max-width: 768px) {
+            .mail-content {
+                flex-direction: column;
+            }
+            .mail-folders {
+                width: 100%;
+                height: 150px;
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+            }
+            .mail-list {
+                width: 100%;
+                height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+            }
+            .mail-preview {
+                height: 400px;
+            }
+            .sidebar-toggle {
+                top: 10px;
+                left: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-2 sidebar">
-                <h4 class="px-3 mb-4">DjCoop</h4>
-                <nav class="nav flex-column">
-                    <a class="nav-link {% if active_menu == 'dashboard' %}active{% endif %}" 
-                       href="{% url 'core:dashboard' %}">Dashboard</a>
-                    <a class="nav-link {% if active_menu == 'djsql' %}active{% endif %}" 
-                       href="{% url 'djsql:djsql' %}">SQL Replication</a>
-                    <a class="nav-link {% if active_menu == 'settings' %}active{% endif %}" 
-                       href="{% url 'core:settings' %}">Settings</a>
-                </nav>
-            </div>
-            
-            <!-- Main Content -->
-            <div class="col-md-10 main-content">
-                <h2 class="mb-4">{{ title }}</h2>
-                {% block content %}{% endblock %}
-            </div>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="px-3 mb-4">
+            <h4 class="mb-2">DjCoop</h4>
+            {% if user.is_authenticated %}
+                <div class="text-muted small">
+                    <i class="bi bi-person-circle"></i> {{ user.email|default:user.username }}
+                    {% if user.is_superuser %}
+                        <span class="badge bg-warning text-dark ms-1">Admin</span>
+                    {% elif user.is_staff %}
+                        <span class="badge bg-info text-white ms-1">Staff</span>
+                    {% endif %}
+                </div>
+                <div class="mt-2">
+                    <a href="{% url 'account_logout' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </div>
+            {% else %}
+                <div class="mt-2">
+                    <a href="{% url 'account_login' %}" class="btn btn-primary btn-sm me-1">Login</a>
+                    <a href="{% url 'account_signup' %}" class="btn btn-outline-primary btn-sm">Register</a>
+                </div>
+            {% endif %}
         </div>
+        <nav class="nav flex-column">
+            <a class="nav-link {% if active_menu == 'dashboard' %}active{% endif %}"
+               href="{% url 'core:dashboard' %}">
+               <i class="bi bi-house"></i> Dashboard
+            </a>
+            <a class="nav-link {% if active_menu == 'djsql' %}active{% endif %}"
+               href="{% url 'djsql:djsql' %}">
+               <i class="bi bi-database"></i> SQL Replication
+            </a>
+
+            <!-- Notes & Documents Section -->
+            <a class="nav-link {% if active_menu == 'djnote' %}active{% endif %}"
+               href="{% url 'djnote:index' %}">
+               <i class="bi bi-file-earmark-text"></i> Notes & Documents
+            </a>
+
+            <!-- Mail Section -->
+            <a class="nav-link {% if active_menu == 'djmail' and '/admin/' not in request.path %}active{% endif %}"
+               href="{% url 'djmail:index' %}">
+               <i class="bi bi-envelope"></i> Mail
+            </a>
+
+            <!-- Mail Admin Section (Superuser and Staff) -->
+            {% if user.is_superuser or user.is_staff %}
+            <a class="nav-link dropdown-toggle {% if active_menu == 'djmail' and '/admin/' in request.path %}active{% endif %}"
+               data-bs-toggle="collapse"
+               href="#mailAdminSubmenu"
+               role="button"
+               aria-expanded="{% if active_menu == 'djmail' and '/admin/' in request.path %}true{% else %}false{% endif %}"
+               aria-controls="mailAdminSubmenu">
+               <i class="bi bi-gear-wide-connected"></i> Mail Admin
+            </a>
+            <div class="collapse {% if active_menu == 'djmail' and '/admin/' in request.path %}show{% endif %}" id="mailAdminSubmenu">
+                <div class="nav-submenu">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"
+                       href="{% url 'djmail:admin_dashboard' %}">
+                       <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    <a class="nav-link {% if 'admin_accounts' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'djmail:admin_accounts' %}">
+                       <i class="bi bi-server"></i> Email Accounts
+                    </a>
+                    <a class="nav-link {% if 'admin_user' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'djmail:admin_user_access' %}">
+                       <i class="bi bi-people"></i> User Access
+                    </a>
+                    <a class="nav-link {% if 'admin_email_logs' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'djmail:admin_email_logs' %}">
+                       <i class="bi bi-journal-text"></i> Server Logs
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <a class="nav-link {% if active_menu == 'settings' %}active{% endif %}"
+               href="{% url 'core:settings' %}">
+               <i class="bi bi-gear-fill"></i> Settings
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        {% if active_menu != 'djmail' or request.resolver_match.url_name != 'index' %}
+            <!-- Sidebar Toggle Button for non-mail pages -->
+            <div class="d-flex align-items-center mb-4">
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h2 class="mb-0">{{ title }}</h2>
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
     </div>
 
     <!-- Core JavaScript -->
@@ -118,6 +283,46 @@
     {% if 'wizard' in request.path %}
     <script src="{% static 'djsql/js/replication-wizard.js' %}"></script>
     {% endif %}
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+        const toggleIcon = sidebarToggle.querySelector('i');
+
+        // Check if sidebar state is saved in localStorage
+        const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (sidebarCollapsed) {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('expanded');
+            toggleIcon.classList.remove('bi-list');
+            toggleIcon.classList.add('bi-x');
+        }
+
+        sidebarToggle.addEventListener('click', function() {
+            const isCollapsed = sidebar.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                // Show sidebar
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('expanded');
+                toggleIcon.classList.remove('bi-x');
+                toggleIcon.classList.add('bi-list');
+                localStorage.setItem('sidebarCollapsed', 'false');
+            } else {
+                // Hide sidebar
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('expanded');
+                toggleIcon.classList.remove('bi-list');
+                toggleIcon.classList.add('bi-x');
+                localStorage.setItem('sidebarCollapsed', 'true');
+            }
+        });
+    });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

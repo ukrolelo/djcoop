@@ -77,7 +77,7 @@ const wizardHandlers = {
         }
         
         try {
-            const response = await fetch(`/dashboard/api/replication/${linkId}/status/`);
+            const response = await fetch(`/djsql/api/replication/${linkId}/status/`);
             const data = await response.json();
             console.log('Raw API response data:', data);
             

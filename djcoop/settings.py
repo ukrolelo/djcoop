@@ -38,10 +38,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # Required for allauth
+
+    # Third party apps
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    # Optional: Add social providers
+    # 'allauth.socialaccount.providers.google',
+    # 'allauth.socialaccount.providers.github',
+
+    # Local apps
     'core.apps.CoreConfig',
     'core.templatetags',
-    'djmail',
+    'djmail.apps.DjmailConfig',
     'djsql.apps.DjsqlConfig',
+    'djnote.apps.DjnoteConfig',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',  # Required for allauth
 ]
 
 ROOT_URLCONF = 'djcoop.urls'
@@ -138,6 +151,17 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Email logging settings (define before LOGGING)
+EMAIL_LOG_LEVEL = 'DEBUG'  # Log all email communications
+EMAIL_LOG_FILE = BASE_DIR / 'logs' / 'email.log'
+EMAIL_LOG_MAX_SIZE = 10 * 1024 * 1024  # 10MB
+EMAIL_LOG_BACKUP_COUNT = 5
+
+# Mail operations logging
+MAIL_OPERATIONS_LOG = BASE_DIR / 'logs' / 'mail_operations.log'
+MAIL_ERRORS_LOG = BASE_DIR / 'logs' / 'mail_errors.log'
+MAIL_FETCH_LOG = BASE_DIR / 'logs' / 'mail_fetch.log'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -152,6 +176,38 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'email_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': EMAIL_LOG_FILE,
+            'maxBytes': EMAIL_LOG_MAX_SIZE,
+            'backupCount': EMAIL_LOG_BACKUP_COUNT,
+            'formatter': 'verbose',
+        },
+        'email_console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'mail_operations_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': MAIL_OPERATIONS_LOG,
+            'maxBytes': EMAIL_LOG_MAX_SIZE,
+            'backupCount': EMAIL_LOG_BACKUP_COUNT,
+            'formatter': 'verbose',
+        },
+        'mail_errors_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': MAIL_ERRORS_LOG,
+            'maxBytes': EMAIL_LOG_MAX_SIZE,
+            'backupCount': EMAIL_LOG_BACKUP_COUNT,
+            'formatter': 'verbose',
+        },
+        'mail_fetch_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': MAIL_FETCH_LOG,
+            'maxBytes': EMAIL_LOG_MAX_SIZE,
+            'backupCount': EMAIL_LOG_BACKUP_COUNT,
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
@@ -163,5 +219,80 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'djmail': {  # Mail app logging
+            'handlers': ['console', 'email_file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'djmail.email': {  # Email-specific logging
+            'handlers': ['email_console', 'email_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'djmail.smtp': {  # SMTP communication logging
+            'handlers': ['email_console', 'email_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'mail_operations': {  # General mail operations
+            'handlers': ['console', 'mail_operations_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'mail_errors': {  # Mail operation errors
+            'handlers': ['console', 'mail_errors_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'mail_fetch': {  # Mail fetching operations
+            'handlers': ['console', 'mail_fetch_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
+
+# =============================================================================
+# DJANGO ALLAUTH CONFIGURATION
+# =============================================================================
+
+# Required for allauth
+SITE_ID = 1
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Default Django auth
+    'allauth.account.auth_backends.AuthenticationBackend',  # Allauth
+]
+
+# Allauth settings (updated format)
+ACCOUNT_LOGIN_METHODS = {'email'}  # Use email instead of username
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # Required signup fields
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Disable email verification for development
+ACCOUNT_RATE_LIMITS = {
+    'login_failed': '5/5m',  # 5 attempts per 5 minutes
+}
+ACCOUNT_LOGOUT_ON_GET = True  # Allow logout via GET request
+ACCOUNT_SESSION_REMEMBER = True  # Remember login sessions
+
+# Email settings for verification (development)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Print emails to console
+# For production, use SMTP:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'
+
+
+
+# Login/Logout URLs
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/mail/'  # Redirect to mail interface after login
+LOGOUT_REDIRECT_URL = '/'  # Redirect to home after logout
+
+# Account forms (optional customization)
+# ACCOUNT_FORMS = {
+#     'signup': 'core.forms.CustomSignupForm',
+# }

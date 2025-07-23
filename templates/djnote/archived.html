@@ -1,0 +1,266 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header with actions -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <p class="text-muted mb-0">Manage your archived scanned documents and notes</p>
+        </div>
+        <div>
+            <a href="{% url 'djnote:index' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Active Scans
+            </a>
+        </div>
+    </div>
+
+    <!-- Search and filters -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <form method="get" class="d-flex">
+                <input type="text" name="search" class="form-control me-2" 
+                       placeholder="Search archived scans..." value="{{ search_query }}">
+                <select name="type" class="form-select me-2" style="width: auto;">
+                    <option value="">All Types</option>
+                    <option value="document" {% if scan_type == 'document' %}selected{% endif %}>Documents</option>
+                    <option value="note" {% if scan_type == 'note' %}selected{% endif %}>Notes</option>
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+        </div>
+        <div class="col-md-4 text-end">
+            <small class="text-muted">{{ total_archived }} archived scan{{ total_archived|pluralize }}</small>
+        </div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-archive"></i> Total Archived
+                    </h5>
+                    <h3 class="mb-0">{{ total_archived }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-file-earmark"></i> Documents
+                    </h5>
+                    <h3 class="mb-0" id="archived-documents-count">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-journal"></i> Notes
+                    </h5>
+                    <h3 class="mb-0" id="archived-notes-count">0</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination info -->
+    {% if page_obj.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <small class="text-muted">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} archived scans
+        </small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    <!-- Archived scans grid -->
+    {% if page_obj %}
+    <div class="row">
+        {% for scan in page_obj %}
+        <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+            <div class="card h-100 border-secondary shadow-sm" 
+                 style="cursor: pointer; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;"
+                 onclick="window.location.href='{% url 'djnote:detail' scan.id %}'"
+                 onmouseover="this.style.transform='translateY(-2px)'; this.classList.remove('shadow-sm'); this.classList.add('shadow');"
+                 onmouseout="this.style.transform='translateY(0px)'; this.classList.remove('shadow'); this.classList.add('shadow-sm');">
+                <!-- Thumbnail -->
+                <div class="card-img-top bg-light d-flex align-items-center justify-content-center position-relative" style="height: 200px;">
+                    <!-- Archived badge -->
+                    <div class="position-absolute top-0 start-0 m-2">
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-archive"></i> Archived
+                        </span>
+                    </div>
+                    
+                    {% if scan.pages.first.thumbnail %}
+                        <img src="{{ scan.pages.first.thumbnail.url }}" 
+                             class="img-fluid rounded" style="max-height: 180px; max-width: 100%; object-fit: cover;" 
+                             alt="{{ scan.title }}">
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-file-earmark" style="font-size: 3rem;"></i>
+                            <p class="mt-2 mb-0">No preview</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body">
+                    <h6 class="card-title text-truncate" title="{{ scan.title }}">{{ scan.title }}</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-{% if scan.scan_type == 'document' %}primary{% else %}success{% endif %}">
+                            {{ scan.get_scan_type_display }}
+                        </span>
+                        {% if scan.document_id %}
+                            <span class="badge bg-success" style="font-size: 1.1rem;">ID: {{ scan.document_id|add:0 }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if scan.description %}
+                        <p class="card-text small text-muted text-truncate" title="{{ scan.description }}">
+                            {{ scan.description }}
+                        </p>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-images"></i> {{ scan.page_count }} page{{ scan.page_count|pluralize }}
+                        </small>
+                        <small class="text-muted">{{ scan.created_at|date:"d.m.Y" }}</small>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <div class="d-grid">
+                            <form method="post" action="{% url 'djnote:restore' scan.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success w-100" onclick="event.stopPropagation();">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Restore
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Previous</a>
+                </li>
+            {% endif %}
+            
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">{{ num }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Last</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-archive text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3">No archived scans found</h4>
+        <p class="text-muted">
+            {% if search_query %}
+                No archived scans match your search criteria.
+            {% else %}
+                You haven't archived any scans yet.
+            {% endif %}
+        </p>
+        <a href="{% url 'djnote:index' %}" class="btn btn-primary">
+            <i class="bi bi-arrow-left"></i> Back to Active Scans
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Count archived documents and notes
+    let documentsCount = 0;
+    let notesCount = 0;
+    
+    {% for scan in page_obj %}
+        {% if scan.scan_type == 'document' %}
+            documentsCount++;
+        {% else %}
+            notesCount++;
+        {% endif %}
+    {% endfor %}
+    
+    // Update the counts in the UI
+    const documentsElement = document.getElementById('archived-documents-count');
+    const notesElement = document.getElementById('archived-notes-count');
+    
+    if (documentsElement) {
+        documentsElement.textContent = documentsCount;
+    }
+    if (notesElement) {
+        notesElement.textContent = notesCount;
+    }
+});
+</script>
+{% endblock %}

@@ -6,6 +6,7 @@ db.sqlite3
 
 # Ignore node_modules directory
 node_modules/
+media/*
 
 # Ignore editor and tool directories
 .vscode/

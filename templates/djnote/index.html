@@ -1,0 +1,179 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header with actions -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <p class="text-muted mb-0">Manage your scanned documents and notes</p>
+        </div>
+        <div>
+            <a href="{% url 'djnote:create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Scan
+            </a>
+            <a href="{% url 'djnote:due_documents' %}" class="btn btn-warning">
+                <i class="bi bi-clock"></i> Due Documents
+                {% if due_documents %}
+                    <span class="badge bg-danger">{{ due_documents.count }}</span>
+                {% endif %}
+            </a>
+            <a href="{% url 'djnote:archived' %}" class="btn btn-secondary">
+                <i class="bi bi-archive"></i> Archived
+            </a>
+        </div>
+    </div>
+
+    <!-- Search and filters -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <form method="get" class="d-flex">
+                <input type="text" name="search" class="form-control me-2" 
+                       placeholder="Search scans..." value="{{ search_query }}">
+                <select name="type" class="form-select me-2" style="width: auto;">
+                    <option value="">All Types</option>
+                    <option value="document" {% if scan_type == 'document' %}selected{% endif %}>Documents</option>
+                    <option value="note" {% if scan_type == 'note' %}selected{% endif %}>Notes</option>
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+        </div>
+        <div class="col-md-4 text-end">
+            <small class="text-muted">{{ total_scans }} total scans</small>
+        </div>
+    </div>
+
+    <!-- Due documents alert -->
+    {% if due_documents %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Documents Due Soon:</strong>
+        {% for doc in due_documents %}
+            <a href="{% url 'djnote:detail' doc.id %}" class="alert-link">{{ doc.title }}</a>
+            {% if not forloop.last %}, {% endif %}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- Scans grid -->
+    {% if page_obj %}
+    <div class="row">
+        {% for scan in page_obj %}
+        <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+            <div class="card h-100 {% if scan.is_overdue %}border-danger{% elif scan.is_due_soon %}border-warning{% endif %} shadow-sm"
+                 style="cursor: pointer; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;"
+                 onclick="window.location.href='{% url 'djnote:detail' scan.id %}'"
+                 onmouseover="this.style.transform='translateY(-2px)'; this.classList.remove('shadow-sm'); this.classList.add('shadow');"
+                 onmouseout="this.style.transform='translateY(0px)'; this.classList.remove('shadow'); this.classList.add('shadow-sm');"">
+                <!-- Thumbnail -->
+                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                    {% if scan.pages.first.thumbnail %}
+                        <img src="{{ scan.pages.first.thumbnail.url }}" 
+                             class="img-fluid" style="max-height: 180px; max-width: 100%;" 
+                             alt="{{ scan.title }}">
+                    {% else %}
+                        <i class="bi bi-file-earmark text-muted" style="font-size: 3rem;"></i>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="card-title mb-0">{{ scan.title|truncatechars:30 }}</h6>
+                        <span class="badge bg-{% if scan.scan_type == 'document' %}primary{% else %}secondary{% endif %}">
+                            {{ scan.get_scan_type_display }}
+                        </span>
+                    </div>
+                    
+                    {% if scan.document_id %}
+                    <div class="mb-2">
+                        <span class="badge bg-success" style="font-size: 1.1rem;">
+                            <i class="bi bi-file-earmark-text"></i> ID: {{ scan.document_id|add:0 }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if scan.description %}
+                    <p class="card-text small text-muted">{{ scan.description|truncatechars:60 }}</p>
+                    {% endif %}
+                    
+                    <div class="mt-auto">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-images"></i> {{ scan.page_count }} page{{ scan.page_count|pluralize }}
+                            </small>
+                            <small class="text-muted">{{ scan.created_at|date:"d.m.Y H:i" }}</small>
+                        </div>
+                        
+                        {% if scan.due_date %}
+                        <div class="mb-2">
+                            <small class="{% if scan.is_overdue %}text-danger{% elif scan.is_due_soon %}text-warning{% else %}text-muted{% endif %}">
+                                <i class="bi bi-clock"></i> Due: {{ scan.due_date|date:"d.m.Y" }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-grid">
+                            <a href="{% url 'djnote:edit' scan.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">
+                                <i class="bi bi-pencil"></i> Edit
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Scans pagination">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Previous</a>
+                </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if scan_type %}&type={{ scan_type }}{% endif %}">Last</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-file-earmark text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3">No scans found</h4>
+        <p class="text-muted">
+            {% if search_query %}
+                No scans match your search criteria.
+            {% else %}
+                Start by creating your first scan.
+            {% endif %}
+        </p>
+        <a href="{% url 'djnote:create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Create First Scan
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

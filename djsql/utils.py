@@ -62,9 +62,19 @@ def decrypt_data(encrypted_data):
         return encrypted_data # Return original data or raise an error
     if not encrypted_data:
         return ""
+
+    # Check if data looks like it's already encrypted (Fernet tokens are base64 and have specific format)
+    # Fernet tokens are always base64 encoded and have a specific structure
     try:
+        # Try to decode as base64 first - if this fails, it's likely plain text
+        import base64
+        base64.urlsafe_b64decode(encrypted_data.encode())
+
+        # If base64 decode succeeds, try Fernet decryption
         decrypted_data = cipher_suite.decrypt(encrypted_data.encode()).decode()
         return decrypted_data
     except Exception as e:
-        logger.error(f"Error decrypting data: {e}")
-        return encrypted_data # Return original data or raise an error
+        # If decryption fails, it's likely plain text - return as is
+        # Only log as debug to avoid spam, since this is expected for plain text passwords
+        logger.debug(f"Data appears to be plain text (decryption failed): {str(e)[:50]}...")
+        return encrypted_data # Return original data (likely plain text)

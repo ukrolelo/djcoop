@@ -1,0 +1,250 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark email as read/unread functionality
+    document.querySelectorAll('.mark-read, .mark-unread').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const emailId = this.dataset.emailId;
+            const action = this.classList.contains('mark-read') ? 'read' : 'unread';
+            
+            fetch(`/mail/mark-${action}/${emailId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+    
+    // Toggle flag functionality
+    document.querySelectorAll('.toggle-flag').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const emailId = this.dataset.emailId;
+            
+            fetch(`/mail/toggle-flag/${emailId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Mail Settings{% if account %} - {{ account.name }}{% endif %}</h3>
+            <div>
+                {% if account %}
+                <a href="{% url 'djmail:compose' %}" class="btn btn-primary">
+                    <i class="bi bi-envelope-plus"></i> Compose
+                </a>
+                <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-repeat"></i> Check Mail
+                </a>
+                {% endif %}
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="accountsDropdown" 
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountsDropdown">
+                        <li><a class="dropdown-item" href="{% url 'djmail:accounts' %}">Manage Accounts</a></li>
+                        <li><a class="dropdown-item" href="{% url 'djmail:add_account' %}">Add Account</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Account Management Sidebar -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Email Accounts</span>
+                    <a href="{% url 'djmail:add_account' %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-plus"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for acc in accounts %}
+                <div class="list-group-item {% if acc == account %}active{% endif %}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ acc.name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ acc.email }}</small>
+                            {% if acc.is_default %}
+                                <span class="badge bg-primary">Default</span>
+                            {% endif %}
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-three-dots"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'djmail:edit_account' acc.id %}">Edit</a></li>
+                                <li><a class="dropdown-item" href="{% url 'djmail:fetch_account_emails' acc.id %}">Check Mail</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="{% url 'djmail:delete_account' acc.id %}">Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="list-group-item text-center">
+                    <p class="mb-2">No email accounts configured</p>
+                    <a href="{% url 'djmail:add_account' %}" class="btn btn-sm btn-primary">Add Account</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if folders %}
+        <!-- Folders -->
+        <div class="card mt-3">
+            <div class="card-header">
+                Folders
+            </div>
+            <div class="list-group list-group-flush">
+                {% for folder in folders %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    {% if folder.folder_type == 'inbox' %}
+                        <span><i class="bi bi-inbox"></i> {{ folder.name }}</span>
+                    {% elif folder.folder_type == 'sent' %}
+                        <span><i class="bi bi-send"></i> {{ folder.name }}</span>
+                    {% elif folder.folder_type == 'drafts' %}
+                        <span><i class="bi bi-file-earmark-text"></i> {{ folder.name }}</span>
+                    {% elif folder.folder_type == 'trash' %}
+                        <span><i class="bi bi-trash"></i> {{ folder.name }}</span>
+                    {% else %}
+                        <span><i class="bi bi-folder"></i> {{ folder.name }}</span>
+                    {% endif %}
+                    <span class="badge bg-secondary">{{ folder.email_set.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if recent_tasks %}
+        <!-- Recent Tasks -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Recent Tasks</span>
+                <a href="{% url 'djmail:tasks' %}" class="btn btn-sm btn-outline-primary">All Tasks</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for task in recent_tasks %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'djmail:task_detail' task.id %}">{{ task.title }}</a>
+                        <span class="badge {% if task.priority == 'high' or task.priority == 'urgent' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
+                            {{ task.get_priority_display }}
+                        </span>
+                    </div>
+                    <small class="text-muted">{{ task.created_at|date:"M d, Y" }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Main Settings Content -->
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Mail Configuration</h5>
+            </div>
+            <div class="card-body">
+                {% if not account %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-envelope-x display-1 text-muted"></i>
+                        <h4 class="mt-3">No Email Accounts</h4>
+                        <p class="text-muted">Get started by adding your first email account.</p>
+                        <a href="{% url 'djmail:add_account' %}" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> Add Email Account
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Account Information</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Name:</strong></td>
+                                    <td>{{ account.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email:</strong></td>
+                                    <td>{{ account.email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Server:</strong></td>
+                                    <td>{{ account.pop3_server }}:{{ account.pop3_port }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>SSL:</strong></td>
+                                    <td>{% if account.use_ssl %}Yes{% else %}No{% endif %}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Default:</strong></td>
+                                    <td>{% if account.is_default %}Yes{% else %}No{% endif %}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Quick Actions</h6>
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'djmail:edit_account' account.id %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> Edit Account
+                                </a>
+                                <a href="{% url 'djmail:fetch_account_emails' account.id %}" class="btn btn-outline-success">
+                                    <i class="bi bi-arrow-repeat"></i> Check for New Mail
+                                </a>
+                                <a href="{% url 'djmail:compose' %}" class="btn btn-outline-info">
+                                    <i class="bi bi-envelope-plus"></i> Compose Email
+                                </a>
+                                <a href="{% url 'djmail:tasks' %}" class="btn btn-outline-warning">
+                                    <i class="bi bi-list-task"></i> View All Tasks
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+{% endblock %}

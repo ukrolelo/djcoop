@@ -1,0 +1,169 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h3>Mail Administration Dashboard</h3>
+        <p class="text-muted">Manage email accounts and user access permissions</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Statistics Cards -->
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Email Accounts</h5>
+                        <h2 class="mb-0">{{ accounts.count }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-server display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Total Users</h5>
+                        <h2 class="mb-0">{{ total_users }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Access Grants</h5>
+                        <h2 class="mb-0">{{ total_accesses }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-key display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Quick Actions -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'djmail:admin_accounts' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-server"></i> Manage Email Accounts
+                    </a>
+                    <a href="{% url 'djmail:admin_user_access' %}" class="btn btn-outline-success">
+                        <i class="bi bi-people"></i> Manage User Access
+                    </a>
+                    <a href="{% url 'djmail:admin_add_account' %}" class="btn btn-outline-info">
+                        <i class="bi bi-plus-circle"></i> Add New Email Account
+                    </a>
+                    <a href="{% url 'djmail:admin_email_logs' %}" class="btn btn-outline-warning">
+                        <i class="bi bi-journal-text"></i> View Server Logs
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Email Accounts -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Email Accounts</h5>
+            </div>
+            <div class="card-body">
+                {% if accounts %}
+                    <div class="list-group list-group-flush">
+                        {% for account in accounts %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ account.name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ account.email }}</small>
+                                {% if account.is_default %}
+                                    <span class="badge bg-primary">Default</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary">
+                                    {{ account.user_accesses.count }} user{{ account.user_accesses.count|pluralize }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-server text-muted display-4"></i>
+                        <p class="text-muted mt-2">No email accounts configured</p>
+                        <a href="{% url 'djmail:admin_add_account' %}" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> Add First Account
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">System Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Multi-User Setup</h6>
+                        <p class="text-muted">
+                            This system is designed for multi-user email access. Superadmins can:
+                        </p>
+                        <ul class="text-muted">
+                            <li>Create and manage email accounts</li>
+                            <li>Grant/revoke user access to specific accounts</li>
+                            <li>Set access levels (Read Only / Full Access)</li>
+                            <li>Monitor user activity and permissions</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Security Features</h6>
+                        <ul class="text-muted">
+                            <li>Fernet encryption for email passwords</li>
+                            <li>User-based access control</li>
+                            <li>Audit trail for permission changes</li>
+                            <li>Separation of admin and user interfaces</li>
+                        </ul>
+                        
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Development Mode:</strong> Authentication is not yet implemented. 
+                            All users currently have superuser access.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

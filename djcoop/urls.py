@@ -6,14 +6,18 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Root URL now redirects to dashboard
-    path('', lambda request: redirect('core:dashboard')),
-    # Add core URLs
-    path('dashboard/', include('core.urls')),
+
+    # Authentication URLs (allauth)
+    path('accounts/', include('allauth.urls')),
+
+    # Dashboard at root
+    path('', include('core.urls')),
     # Add djsql URLs
     path('djsql/', include('djsql.urls', namespace='djsql')),
     # Add djmail URLs
     path('mail/', include('djmail.urls')),
+    # Add djnote URLs
+    path('notes/', include('djnote.urls', namespace='djnote')),
 ]
 
 # Add static and media file serving for development

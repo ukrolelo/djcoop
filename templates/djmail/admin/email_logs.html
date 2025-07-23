@@ -1,0 +1,317 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h3>Email Server Communication Logs</h3>
+        <p class="text-muted">Monitor all email server communications for debugging and auditing</p>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'djmail:admin_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Logs</h6>
+                        <h4 class="mb-0">{{ stats.total_logs }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-journal-text display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Error Logs</h6>
+                        <h4 class="mb-0">{{ stats.error_logs }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-exclamation-triangle display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Today's Logs</h6>
+                        <h4 class="mb-0">{{ stats.today_logs }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-calendar-day display-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Filter Logs</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="log_type" class="form-label">Log Type</label>
+                        <select name="log_type" id="log_type" class="form-select">
+                            <option value="">All Types</option>
+                            {% for value, label in log_types %}
+                                <option value="{{ value }}" {% if current_filters.log_type == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="">All Statuses</option>
+                            {% for value, label in statuses %}
+                                <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="account_id" class="form-label">Email Account</label>
+                        <select name="account_id" id="account_id" class="form-select">
+                            <option value="">All Accounts</option>
+                            {% for account in accounts %}
+                                <option value="{{ account.id }}" {% if current_filters.account_id == account.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ account.name }} ({{ account.email }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <a href="{% url 'djmail:admin_email_logs' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Logs Table -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Server Communication Logs</h5>
+            </div>
+            <div class="card-body">
+                {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Account</th>
+                                    <th>User</th>
+                                    <th>Message</th>
+                                    <th>Duration</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr class="{% if log.status == 'error' %}table-danger{% elif log.status == 'warning' %}table-warning{% elif log.status == 'success' %}table-success{% endif %}">
+                                    <td>
+                                        <small>
+                                            {{ log.timestamp|date:"M d, H:i:s" }}
+                                            <br>
+                                            <span class="text-muted">{{ log.session_id }}</span>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.get_log_type_display }}</span>
+                                    </td>
+                                    <td>
+                                        {% if log.status == 'success' %}
+                                            <span class="badge bg-success">{{ log.get_status_display }}</span>
+                                        {% elif log.status == 'error' %}
+                                            <span class="badge bg-danger">{{ log.get_status_display }}</span>
+                                        {% elif log.status == 'warning' %}
+                                            <span class="badge bg-warning text-dark">{{ log.get_status_display }}</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ log.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.email_account %}
+                                            <small>
+                                                <strong>{{ log.email_account.name }}</strong>
+                                                <br>
+                                                {{ log.email_account.email }}
+                                            </small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.user %}
+                                            <small>{{ log.user.email|default:log.user.username }}</small>
+                                        {% else %}
+                                            <span class="text-muted">System</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ log.message|truncatechars:100 }}</small>
+                                        {% if log.command %}
+                                            <br><code class="small">{{ log.command|truncatechars:50 }}</code>
+                                        {% endif %}
+                                        {% if log.response %}
+                                            <br><small class="text-muted">→ {{ log.response|truncatechars:50 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.duration_ms %}
+                                            <small>{{ log.duration_ms }}ms</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.error_message %}
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#errorModal{{ log.id }}"
+                                                    title="View Error">
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                            </button>
+                                        {% endif %}
+                                        
+                                        {% if log.details %}
+                                            <button class="btn btn-sm btn-outline-info" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#detailsModal{{ log.id }}"
+                                                    title="View Details">
+                                                <i class="bi bi-info-circle"></i>
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if logs.has_other_pages %}
+                        <nav aria-label="Logs pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if logs.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ logs.previous_page_number }}{% if current_filters.log_type %}&log_type={{ current_filters.log_type }}{% endif %}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.account_id %}&account_id={{ current_filters.account_id }}{% endif %}">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Page {{ logs.number }} of {{ logs.paginator.num_pages }}
+                                    </span>
+                                </li>
+                                
+                                {% if logs.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ logs.next_page_number }}{% if current_filters.log_type %}&log_type={{ current_filters.log_type }}{% endif %}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.account_id %}&account_id={{ current_filters.account_id }}{% endif %}">Next</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-journal-text text-muted display-4"></i>
+                        <p class="text-muted mt-2">No email server logs found</p>
+                        <p class="text-muted">Logs will appear here when emails are sent or received.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modals -->
+{% for log in logs %}
+    {% if log.error_message %}
+        <div class="modal fade" id="errorModal{{ log.id }}" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Error Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Timestamp:</strong> {{ log.timestamp }}</p>
+                        <p><strong>Type:</strong> {{ log.get_log_type_display }}</p>
+                        <p><strong>Message:</strong> {{ log.message }}</p>
+                        <p><strong>Error:</strong></p>
+                        <pre class="bg-light p-2">{{ log.error_message }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    
+    {% if log.details %}
+        <div class="modal fade" id="detailsModal{{ log.id }}" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Log Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Timestamp:</strong> {{ log.timestamp }}</p>
+                        <p><strong>Session ID:</strong> {{ log.session_id }}</p>
+                        {% if log.command %}
+                            <p><strong>Command:</strong></p>
+                            <pre class="bg-light p-2">{{ log.command }}</pre>
+                        {% endif %}
+                        {% if log.response %}
+                            <p><strong>Response:</strong></p>
+                            <pre class="bg-light p-2">{{ log.response }}</pre>
+                        {% endif %}
+                        <p><strong>Details:</strong></p>
+                        <pre class="bg-light p-2">{{ log.details|pprint }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}
+{% endblock %}

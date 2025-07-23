@@ -1,7 +1,654 @@
 {% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // CSRF token for AJAX requests
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Export functionality
+    const exportForm = document.getElementById('export-form');
+    const exportBtn = document.getElementById('export-btn');
+    const exportProgress = document.getElementById('export-progress');
+    const exportStatus = document.getElementById('export-status');
+
+    if (exportForm) {
+        exportForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            startExport();
+        });
+    }
+
+    function startExport() {
+        const formData = new FormData(exportForm);
+
+        exportBtn.disabled = true;
+        exportProgress.style.display = 'block';
+        exportStatus.innerHTML = '<div class="alert alert-info">Starting backup...</div>';
+
+        fetch('{% url "core:start_export" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pollExportStatus(data.operation_id);
+            } else {
+                showError('Backup Error', data.error);
+                resetExportForm();
+            }
+        })
+        .catch(error => {
+            showError('Backup Error', 'Network error occurred');
+            resetExportForm();
+        });
+    }
+
+    function pollExportStatus(operationId) {
+        const interval = setInterval(() => {
+            fetch(`/settings/export/status/${operationId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateExportProgress(data);
+
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        showExportComplete(operationId, data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        showError('Backup Failed', data.error_message);
+                        resetExportForm();
+                    }
+                }
+            })
+            .catch(error => {
+                clearInterval(interval);
+                showError('Status Error', 'Could not check backup status');
+                resetExportForm();
+            });
+        }, 2000);
+    }
+
+    function updateExportProgress(data) {
+        const progressBar = document.querySelector('#export-progress .progress-bar');
+        const statusText = document.querySelector('#export-status');
+
+        if (progressBar) {
+            progressBar.style.width = data.progress + '%';
+            progressBar.textContent = Math.round(data.progress) + '%';
+        }
+
+        statusText.innerHTML = `
+            <div class="alert alert-info">
+                <strong>Creating Backup...</strong><br>
+                Progress: ${data.processed_records}/${data.total_records} records<br>
+                Status: ${data.status}
+            </div>
+        `;
+    }
+
+    function showExportComplete(operationId, data) {
+        const statusText = document.querySelector('#export-status');
+
+        // Debug: log the data to see what we're getting
+        console.log('Export completion data:', data);
+
+        const filename = data.filename || 'Unknown';
+        const fileSize = data.file_size || 0;
+        const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2);
+
+        statusText.innerHTML = `
+            <div class="alert alert-success">
+                <strong>Backup Completed!</strong><br>
+                File: ${filename}<br>
+                Size: ${fileSizeMB} MB<br>
+                <a href="/settings/export/download/${operationId}/" class="btn btn-success btn-sm mt-2">
+                    <i class="bi bi-download"></i> Download Backup
+                </a>
+            </div>
+        `;
+        resetExportForm();
+    }
+
+    function resetExportForm() {
+        exportBtn.disabled = false;
+        exportProgress.style.display = 'none';
+    }
+
+    // Import functionality
+    const importForm = document.getElementById('import-form');
+    const importBtn = document.getElementById('import-btn');
+    const importProgress = document.getElementById('import-progress');
+    const importStatus = document.getElementById('import-status');
+    const conflictModal = new bootstrap.Modal(document.getElementById('conflict-modal'));
+
+    if (importForm) {
+        importForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            startImport();
+        });
+    }
+
+    function startImport() {
+        const formData = new FormData(importForm);
+
+        importBtn.disabled = true;
+        importProgress.style.display = 'block';
+        importStatus.innerHTML = '<div class="alert alert-info">Uploading and validating backup...</div>';
+
+        fetch('{% url "core:upload_import_file" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pollImportValidation(data.operation_id);
+            } else {
+                showError('Restore Error', data.error);
+                resetImportForm();
+            }
+        })
+        .catch(error => {
+            showError('Restore Error', 'Network error occurred');
+            resetImportForm();
+        });
+    }
+
+    function pollImportValidation(operationId) {
+        const interval = setInterval(() => {
+            fetch(`/settings/import/validation/${operationId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.status === 'pending') {
+                        clearInterval(interval);
+                        handleValidationComplete(operationId, data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        showError('Validation Failed', data.error_message);
+                        resetImportForm();
+                    }
+                }
+            })
+            .catch(error => {
+                clearInterval(interval);
+                showError('Validation Error', 'Could not check validation status');
+                resetImportForm();
+            });
+        }, 1000);
+    }
+
+    function handleValidationComplete(operationId, data) {
+        const validation = data.validation_results;
+
+        if (validation.conflicts && validation.conflicts.length > 0) {
+            showConflictResolution(operationId, validation.conflicts);
+        } else {
+            // No conflicts, proceed with import
+            proceedWithImport(operationId, {});
+        }
+    }
+
+    function showConflictResolution(operationId, conflicts) {
+        const conflictList = document.getElementById('conflict-list');
+        conflictList.innerHTML = '';
+
+        conflicts.forEach((conflict, index) => {
+            const conflictDiv = document.createElement('div');
+            conflictDiv.className = 'mb-3 p-3 border rounded';
+            conflictDiv.innerHTML = `
+                <h6>${conflict.model} - ${conflict.message}</h6>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="conflict_${conflict.model}:${conflict.pk}"
+                           id="skip_${index}" value="skip" checked>
+                    <label class="form-check-label" for="skip_${index}">Skip (keep existing)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="conflict_${conflict.model}:${conflict.pk}"
+                           id="overwrite_${index}" value="overwrite">
+                    <label class="form-check-label" for="overwrite_${index}">Overwrite existing</label>
+                </div>
+            `;
+            conflictList.appendChild(conflictDiv);
+        });
+
+        document.getElementById('proceed-import-btn').onclick = function() {
+            const selections = {};
+            const formData = new FormData(document.getElementById('conflict-form'));
+            for (let [key, value] of formData.entries()) {
+                if (key.startsWith('conflict_')) {
+                    const conflictKey = key.replace('conflict_', '');
+                    if (!selections.conflicts) selections.conflicts = {};
+                    selections.conflicts[conflictKey] = value;
+                }
+            }
+
+            conflictModal.hide();
+            proceedWithImport(operationId, selections);
+        };
+
+        conflictModal.show();
+    }
+
+    function proceedWithImport(operationId, selections) {
+        importStatus.innerHTML = '<div class="alert alert-info">Starting restore...</div>';
+
+        fetch(`/settings/import/start/${operationId}/`, {
+            method: 'POST',
+            body: JSON.stringify(selections),
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pollImportStatus(operationId);
+            } else {
+                showError('Restore Error', data.error);
+                resetImportForm();
+            }
+        })
+        .catch(error => {
+            showError('Restore Error', 'Network error occurred');
+            resetImportForm();
+        });
+    }
+
+    function pollImportStatus(operationId) {
+        const interval = setInterval(() => {
+            fetch(`/settings/import/status/${operationId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateImportProgress(data);
+
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        showImportComplete(data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        showError('Import Failed', data.error_message);
+                        resetImportForm();
+                    }
+                }
+            })
+            .catch(error => {
+                clearInterval(interval);
+                showError('Status Error', 'Could not check import status');
+                resetImportForm();
+            });
+        }, 2000);
+    }
+
+    function updateImportProgress(data) {
+        const progressBar = document.querySelector('#import-progress .progress-bar');
+        const statusText = document.querySelector('#import-status');
+
+        if (progressBar) {
+            progressBar.style.width = data.progress + '%';
+            progressBar.textContent = Math.round(data.progress) + '%';
+        }
+
+        statusText.innerHTML = `
+            <div class="alert alert-info">
+                <strong>Restoring...</strong><br>
+                Progress: ${data.processed_records}/${data.total_records} records<br>
+                Failed: ${data.failed_records}<br>
+                Status: ${data.status}
+            </div>
+        `;
+    }
+
+    function showImportComplete(data) {
+        const statusText = document.querySelector('#import-status');
+        statusText.innerHTML = `
+            <div class="alert alert-success">
+                <strong>Restore Completed!</strong><br>
+                Processed: ${data.processed_records}/${data.total_records} records<br>
+                Failed: ${data.failed_records} records<br>
+                Completed: ${data.completed_at}
+            </div>
+        `;
+        resetImportForm();
+
+        // Refresh the page to show updated data
+        setTimeout(() => {
+            location.reload();
+        }, 3000);
+    }
+
+    function resetImportForm() {
+        importBtn.disabled = false;
+        importProgress.style.display = 'none';
+        importForm.reset();
+    }
+
+    function showError(title, message) {
+        const errorModal = document.getElementById('error-modal');
+        document.getElementById('error-modal-title').textContent = title;
+        document.getElementById('error-modal-body').textContent = message;
+        new bootstrap.Modal(errorModal).show();
+    }
+
+    // Cleanup functionality
+    const cleanupBtn = document.getElementById('cleanup-btn');
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', function() {
+            const days = document.getElementById('cleanup_days').value;
+
+            if (!confirm(`Are you sure you want to delete all backup operations older than ${days} days? This will also delete the backup files.`)) {
+                return;
+            }
+
+            cleanupBtn.disabled = true;
+            cleanupBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Cleaning up...';
+
+            const cleanupStatus = document.getElementById('cleanup-status');
+            cleanupStatus.innerHTML = '<div class="alert alert-info">Cleaning up old operations...</div>';
+
+            fetch('{% url "core:cleanup_old_operations" %}', {
+                method: 'POST',
+                body: new FormData(Object.assign(document.createElement('form'), {
+                    innerHTML: `<input name="days" value="${days}"><input name="csrfmiddlewaretoken" value="${csrfToken}">`
+                })),
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    cleanupStatus.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>Cleanup Completed!</strong><br>
+                            ${data.message}
+                        </div>
+                    `;
+
+                    // Refresh the history tab to show updated list
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    cleanupStatus.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Cleanup Failed:</strong> ${data.error}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                cleanupStatus.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> Network error occurred during cleanup
+                    </div>
+                `;
+            })
+            .finally(() => {
+                cleanupBtn.disabled = false;
+                cleanupBtn.innerHTML = '<i class="bi bi-trash"></i> Clean Up Old Operations';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
 
 {% block content %}
 <div class="row">
+    <!-- Import/Export Section -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Database & Media Backup/Restore</h5>
+
+                <!-- Tab Navigation -->
+                <ul class="nav nav-tabs" id="importExportTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="export-tab" data-bs-toggle="tab" data-bs-target="#export-pane"
+                                type="button" role="tab" aria-controls="export-pane" aria-selected="true">
+                            <i class="bi bi-download"></i> Create Backup
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="import-tab" data-bs-toggle="tab" data-bs-target="#import-pane"
+                                type="button" role="tab" aria-controls="import-pane" aria-selected="false">
+                            <i class="bi bi-upload"></i> Restore Backup
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane"
+                                type="button" role="tab" aria-controls="history-pane" aria-selected="false">
+                            <i class="bi bi-clock-history"></i> History
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="cleanup-tab" data-bs-toggle="tab" data-bs-target="#cleanup-pane"
+                                type="button" role="tab" aria-controls="cleanup-pane" aria-selected="false">
+                            <i class="bi bi-trash"></i> Cleanup
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content mt-3" id="importExportTabContent">
+                    <!-- Backup Tab -->
+                    <div class="tab-pane fade show active" id="export-pane" role="tabpanel" aria-labelledby="export-tab">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Database & Media Backup</strong><br>
+                            Create a complete backup of your database data and media files. This includes all user data,
+                            configurations, and uploaded files (scans, email attachments, etc.).
+                        </div>
+
+                        <form id="export-form">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label">Select Database Apps to Backup:</label>
+                                {% for app_name, models in exportable_apps.items %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="apps" value="{{ app_name }}"
+                                           id="app_{{ app_name }}" checked>
+                                    <label class="form-check-label" for="app_{{ app_name }}">
+                                        <strong>{{ app_name|title }}</strong>
+                                        <small class="text-muted">({{ models|length }} models)</small>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="include_media" value="true"
+                                           id="include_media" checked>
+                                    <label class="form-check-label" for="include_media">
+                                        <strong>Include Media Files</strong>
+                                        <small class="text-muted d-block">Include uploaded files (scans, email attachments, etc.)</small>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="export-btn" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Create Backup
+                            </button>
+                        </form>
+
+                        <!-- Export Progress -->
+                        <div id="export-progress" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                        </div>
+
+                        <!-- Export Status -->
+                        <div id="export-status" class="mt-3"></div>
+                    </div>
+
+                    <!-- Restore Tab -->
+                    <div class="tab-pane fade" id="import-pane" role="tabpanel" aria-labelledby="import-tab">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Restore from Backup</strong><br>
+                            <strong>Warning:</strong> Restoring will overwrite existing data based on your conflict resolution choices.
+                            Make sure to backup your current data before proceeding.
+                        </div>
+
+                        <form id="import-form">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="import_file" class="form-label">Select Backup File (ZIP):</label>
+                                <input type="file" class="form-control" id="import_file" name="import_file"
+                                       accept=".zip" required>
+                                <div class="form-text">
+                                    Upload a ZIP backup file created by DjCoop. The file will be validated before restore.
+                                </div>
+                            </div>
+
+                            <button type="submit" id="import-btn" class="btn btn-warning">
+                                <i class="bi bi-upload"></i> Upload & Validate Backup
+                            </button>
+                        </form>
+
+                        <!-- Import Progress -->
+                        <div id="import-progress" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                        </div>
+
+                        <!-- Import Status -->
+                        <div id="import-status" class="mt-3"></div>
+                    </div>
+
+                    <!-- History Tab -->
+                    <div class="tab-pane fade" id="history-pane" role="tabpanel" aria-labelledby="history-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Apps</th>
+                                        <th>Records</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for operation in recent_operations %}
+                                    <tr>
+                                        <td>
+                                            {% if operation.operation_type == 'export' %}
+                                                <i class="bi bi-download"></i>
+                                            {% else %}
+                                                <i class="bi bi-upload"></i>
+                                            {% endif %}
+                                            {{ operation.get_operation_type_display }}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if operation.status == 'completed' %}success{% elif operation.status == 'failed' %}danger{% elif operation.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                                {{ operation.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small>{{ operation.apps_included|join:", " }}</small>
+                                        </td>
+                                        <td>{{ operation.processed_records }}/{{ operation.total_records }}</td>
+                                        <td>{{ operation.created_at|date:"d.m.Y H:i" }}</td>
+                                        <td>
+                                            {% if operation.operation_type == 'export' and operation.status == 'completed' %}
+                                            <a href="{% url 'core:download_export' operation.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            {% endif %}
+                                            <button class="btn btn-sm btn-outline-secondary"
+                                                    onclick="showOperationLogs('{{ operation.id }}')">
+                                                <i class="bi bi-list-ul"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">No operations yet</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Cleanup Tab -->
+                    <div class="tab-pane fade" id="cleanup-pane" role="tabpanel" aria-labelledby="cleanup-tab">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Cleanup Old Backups</strong><br>
+                            Remove old backup/restore operations and their files to free up disk space.
+                            You can also manually delete ZIP files from the file system if you prefer.
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Quick Cleanup</h6>
+                                        <p class="card-text">Remove operations older than specified days.</p>
+
+                                        <div class="mb-3">
+                                            <label for="cleanup_days" class="form-label">Keep operations from last:</label>
+                                            <select class="form-select" id="cleanup_days">
+                                                <option value="7">7 days</option>
+                                                <option value="30" selected>30 days</option>
+                                                <option value="90">90 days</option>
+                                                <option value="365">1 year</option>
+                                            </select>
+                                        </div>
+
+                                        <button type="button" class="btn btn-warning" id="cleanup-btn">
+                                            <i class="bi bi-trash"></i> Clean Up Old Operations
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Manual Cleanup</h6>
+                                        <p class="card-text">You can also manually delete backup files:</p>
+                                        <ul class="small">
+                                            <li><strong>Backup files:</strong> <code>media/exports/</code></li>
+                                            <li><strong>Import files:</strong> <code>media/imports/</code></li>
+                                        </ul>
+                                        <p class="small text-muted">
+                                            Just delete the ZIP files you don't need anymore. The database records
+                                            will show as "file not found" but won't cause any issues.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cleanup Status -->
+                        <div id="cleanup-status" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Settings -->
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-body">
@@ -32,6 +679,8 @@
             </div>
         </div>
     </div>
+
+    <!-- MySQL Configuration -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-body">
@@ -63,4 +712,110 @@
         </div>
     </div>
 </div>
+
+<!-- Conflict Resolution Modal -->
+<div class="modal fade" id="conflict-modal" tabindex="-1" aria-labelledby="conflict-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="conflict-modal-label">Resolve Import Conflicts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>The import file contains data that conflicts with existing records. Please choose how to handle each conflict:</p>
+                <form id="conflict-form">
+                    <div id="conflict-list"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="proceed-import-btn">Proceed with Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="error-modal" tabindex="-1" aria-labelledby="error-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="error-modal-title">Error</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="error-modal-body">
+                <!-- Error message will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Operation Logs Modal -->
+<div class="modal fade" id="logs-modal" tabindex="-1" aria-labelledby="logs-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="logs-modal-label">Operation Logs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="logs-content" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Logs will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showOperationLogs(operationId) {
+    const logsModal = new bootstrap.Modal(document.getElementById('logs-modal'));
+    const logsContent = document.getElementById('logs-content');
+
+    logsContent.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+    logsModal.show();
+
+    fetch(`/settings/operation/logs/${operationId}/`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let logsHtml = '';
+            data.logs.forEach(log => {
+                const badgeClass = {
+                    'info': 'bg-info',
+                    'warning': 'bg-warning',
+                    'error': 'bg-danger',
+                    'debug': 'bg-secondary'
+                }[log.level] || 'bg-secondary';
+
+                logsHtml += `
+                    <div class="mb-2 p-2 border-start border-3 border-${log.level === 'error' ? 'danger' : log.level === 'warning' ? 'warning' : 'info'}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="badge ${badgeClass}">${log.level.toUpperCase()}</span>
+                            <small class="text-muted">${log.timestamp}</small>
+                        </div>
+                        <div class="mt-1">${log.message}</div>
+                        ${log.details && Object.keys(log.details).length > 0 ?
+                            `<details class="mt-1"><summary>Details</summary><pre class="small">${JSON.stringify(log.details, null, 2)}</pre></details>` :
+                            ''
+                        }
+                    </div>
+                `;
+            });
+            logsContent.innerHTML = logsHtml || '<div class="text-muted">No logs available</div>';
+        } else {
+            logsContent.innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
+        }
+    })
+    .catch(error => {
+        logsContent.innerHTML = '<div class="alert alert-danger">Network error loading logs</div>';
+    });
+}
+</script>
 {% endblock %}
